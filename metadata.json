@@ -1,0 +1,5 @@
+{
+  "name": "INCENDEIA CAPOEIRA ON",
+  "description": "Aplicativo oficial do Grupo Incendeia Capoeira com gestão de membros, financeiro, loja e chat em tempo real.",
+  "requestFramePermissions": ["camera"]
+}

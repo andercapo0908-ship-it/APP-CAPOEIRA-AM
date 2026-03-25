@@ -1,0 +1,196 @@
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-black-ops: "Black Ops One", system-ui, sans-serif;
+  
+  --color-premium-black: #050505;
+  --color-incendeia-red: #cc0000;
+  --color-incendeia-orange: #ff6600;
+}
+
+@layer base {
+  body {
+    @apply bg-premium-black text-white font-sans;
+    background: radial-gradient(circle at center, #1a0000 0%, #050505 100%);
+  }
+}
+
+.font-black-ops {
+  font-family: var(--font-black-ops);
+}
+
+.text-flag-br {
+  background: url('https://flagcdn.com/w640/br.png');
+  background-size: cover;
+  background-position: center;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+}
+
+.text-flag-es {
+  background: url('https://flagcdn.com/w640/es.png');
+  background-size: cover;
+  background-position: center;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+}
+
+.ink-splash-orange {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, var(--color-incendeia-orange) 0%, transparent 70%);
+  filter: blur(40px);
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: #cc0000;
+  border-radius: 10px;
+}
+
+/* Fire Animation */
+@keyframes fire-rotate {
+  0% { transform: rotate(0deg) scale(1); filter: blur(2px) brightness(1.2); }
+  50% { transform: rotate(180deg) scale(1.1); filter: blur(4px) brightness(1.5); }
+  100% { transform: rotate(360deg) scale(1); filter: blur(2px) brightness(1.2); }
+}
+
+@keyframes fire-flicker {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+.animate-fire {
+  animation: fire-rotate 4s linear infinite, fire-flicker 0.1s ease-in-out infinite;
+}
+
+.fire-glow {
+  box-shadow: 0 0 40px 20px rgba(204, 0, 0, 0.4),
+              0 0 100px 50px rgba(255, 102, 0, 0.2);
+}
+
+/* Smoke Effect */
+.smoke-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.smoke-particle {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(40px);
+  animation: smoke-move var(--duration) linear infinite;
+  opacity: 0;
+}
+
+@keyframes smoke-move {
+  0% { transform: translate(var(--start-x), 110%) scale(1); opacity: 0; }
+  20% { opacity: 0.3; }
+  80% { opacity: 0.3; }
+  100% { transform: translate(var(--end-x), -10%) scale(2); opacity: 0; }
+}
+
+/* Ginga Animation */
+@keyframes ginga-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  25% { transform: translateY(-10px) translateX(5px); }
+  50% { transform: translateY(0) translateX(10px); }
+  75% { transform: translateY(10px) translateX(5px); }
+}
+
+.animate-ginga {
+  animation: ginga-float 4s ease-in-out infinite;
+}
+
+/* Splash Effect */
+.btn-splash {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-splash::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.4s ease-out, height 0.4s ease-out;
+}
+
+.btn-splash:active::after {
+  width: 200%;
+  height: 200%;
+}
+
+.distressed-red {
+  background-color: #cc0000;
+  background-image: url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 5px 15px rgba(0,0,0,0.5);
+  border: 4px solid rgba(0,0,0,0.3);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.distressed-red:active {
+  transform: scale(0.92);
+  box-shadow: inset 0 0 30px rgba(0,0,0,0.8), 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* Ink Explosion Effect */
+.ink-explosion {
+  position: absolute;
+  background: #000;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  z-index: 5;
+  mix-blend-mode: multiply;
+  animation: ink-burst 0.6s ease-out forwards;
+}
+
+@keyframes ink-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.5);
+    opacity: 0;
+  }
+}
+
+.distressed-red::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('https://www.transparenttextures.com/patterns/black-linen.png');
+  opacity: 0.3;
+  pointer-events: none;
+}

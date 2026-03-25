@@ -1,0 +1,178 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "nickname": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "graduation": { "type": "string" },
+        "age": { "type": "number" },
+        "capoeiraTime": { "type": "string" },
+        "bio": { "type": "string" },
+        "gender": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "photoURL"]
+    },
+    "GalleryItem": {
+      "title": "Gallery Item",
+      "description": "Photos and videos in the gallery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "video"] },
+        "url": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "likes": { "type": "array", "items": { "type": "string" } },
+        "reactions": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "url", "authorUid"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Comments on gallery items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "authorUid", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Messages in chat rooms",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "createdAt"]
+    },
+    "StoreItem": {
+      "title": "Store Item",
+      "description": "Products available in the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["name", "price", "imageUrl"]
+    },
+    "Master": {
+      "title": "Master",
+      "description": "Information about capoeira masters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "photoURL": { "type": "string" }
+      },
+      "required": ["name", "photoURL"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Group events, workshops, and training sessions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" },
+        "type": { "type": "string", "enum": ["training", "workshop", "roda", "other"] },
+        "authorUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "date", "type", "authorUid"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment records for members",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["paid", "pending", "overdue"] },
+        "type": { "type": "string", "enum": ["monthly", "event", "other"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status", "type"]
+    },
+    "FeeConfig": {
+      "title": "Fee Configuration",
+      "description": "Standard fees for the group",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "amount": { "type": "number" },
+        "frequency": { "type": "string", "enum": ["monthly", "one-time"] },
+        "description": { "type": "string" }
+      },
+      "required": ["name", "amount", "frequency"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/gallery/{itemId}": {
+      "schema": "GalleryItem",
+      "description": "Gallery content"
+    },
+    "/gallery/{itemId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on gallery items"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages"
+    },
+    "/store/{itemId}": {
+      "schema": "StoreItem",
+      "description": "Store products"
+    },
+    "/masters/{masterId}": {
+      "schema": "Master",
+      "description": "Masters profiles"
+    },
+    "/events/{eventId}": {
+      "schema": "Event",
+      "description": "Calendar events"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment records"
+    },
+    "/feeConfigs/{configId}": {
+      "schema": "FeeConfig",
+      "description": "Fee configurations"
+    }
+  }
+}
