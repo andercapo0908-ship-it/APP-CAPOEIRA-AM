@@ -809,8 +809,8 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
             </button>
           </div>
           <div className="grid grid-cols-7 gap-2 text-center">
-            {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map(d => (
-              <span key={d} className="text-[8px] font-bold text-zinc-600 mb-2">{d}</span>
+            {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, index) => (
+              <span key={index} className="text-[8px] font-bold text-zinc-600 mb-2">{d}</span>
             ))}
             {/* Empty slots for the first week */}
             {Array.from({ length: firstDayOfMonth }).map((_, i) => (
