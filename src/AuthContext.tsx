@@ -11,7 +11,8 @@ import {
 } from 'firebase/auth';
 import { doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, query, orderBy, limit, deleteDoc, getDocs, startAfter, QueryDocumentSnapshot, updateDoc, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { auth, db, storage, handleFirestoreError, OperationType } from './firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { compressImage } from './lib/uploadUtils';
 
 import { 
   UserProfile, 
@@ -24,7 +25,10 @@ import {
   FeeConfig, 
   StoreItem, 
   Master,
-  Language
+  Language,
+  AppConfig,
+  AppNotification,
+  Branch
 } from './types';
 
 interface AuthContextType {
@@ -51,6 +55,7 @@ interface AuthContextType {
   getGalleryComments: (itemId: string, callback: (comments: GalleryComment[]) => void) => () => void;
   addEvent: (event: Omit<CalendarEvent, 'id' | 'authorUid' | 'createdAt'>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
+  updateEvent: (id: string, data: Partial<CalendarEvent>) => Promise<void>;
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<void>;
   updatePaymentStatus: (id: string, status: Payment['status']) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
@@ -75,7 +80,17 @@ interface AuthContextType {
   masters: Master[];
   allUsers: UserProfile[];
   userGallery: GalleryItem[];
+  notifications: AppNotification[];
+  branches: Branch[];
+  markNotificationAsRead: (id: string) => Promise<void>;
+  requestNotificationPermission: () => Promise<void>;
+  addBranch: (data: Omit<Branch, 'id' | 'createdAt'>) => Promise<void>;
+  deleteBranch: (id: string) => Promise<void>;
   isAdmin: boolean;
+  appConfig: AppConfig | null;
+  updateAppConfig: (data: Partial<AppConfig>) => Promise<void>;
+  uploadProgress: number;
+  uploadFile: (file: File, path: string) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -95,8 +110,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [trainingLogs, setTrainingLogs] = useState<TrainingLog[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [userGallery, setUserGallery] = useState<GalleryItem[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const uploadFile = async (file: File, path: string) => {
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      try {
+        fileToUpload = await compressImage(file);
+      } catch (e) {
+        console.warn("Compression failed, using original file", e);
+      }
+    }
+
+    // Sanitize filename to avoid issues with special characters
+    const sanitizedName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+    const storageRef = ref(storage, `${path}/${Date.now()}_${sanitizedName}`);
+    const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
+
+    return new Promise<string>((resolve, reject) => {
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error) => {
+          console.error("Upload error:", error);
+          setUploadProgress(0);
+          reject(error);
+        }, 
+        async () => {
+          try {
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            setUploadProgress(0);
+            resolve(url);
+          } catch (e) {
+            reject(e);
+          }
+        }
+      );
+    });
+  };
 
   const GALLERY_PAGE_SIZE = 10;
 
@@ -110,25 +168,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return prev;
       });
-    }, 5000);
+    }, 10000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubs: (() => void)[] = [];
+
+    // Listen to app config
+    const unsubConfig = onSnapshot(doc(db, 'config', 'current'), (snapshot) => {
+      if (snapshot.exists()) {
+        setAppConfig(snapshot.data() as AppConfig);
+      } else {
+        console.log('No app config found');
+      }
+    }, (error) => {
+      console.error('Config listener error:', error);
+      // Don't use handleFirestoreError here to avoid spamming the user on boot if they are not logged in
+      // and the rule was restrictive. But now it's public read.
+    });
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.uid);
       setUser(firebaseUser);
       
+      // Clean up previous listeners
+      unsubs.forEach(unsub => unsub());
+      unsubs = [];
+
       if (firebaseUser) {
         // Listen to profile
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const unsubProfile = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const data = docSnap.data();
+            console.log('Profile loaded:', data.nickname);
+            
+            // Auto-promote special admin
+            const isSpecial = firebaseUser.email?.startsWith('andercapo0908') || data.nickname?.toLowerCase() === 'andercapo0908';
+            if (isSpecial && data.role !== 'admin') {
+              updateDoc(userDocRef, { role: 'admin' }).catch(console.error);
+            }
+            
+            setProfile(data as UserProfile);
           } else {
+            console.log('No profile found, creating initial profile');
             // Create initial profile
             const initialProfile: Partial<UserProfile> = {
               uid: firebaseUser.uid,
-              displayName: firebaseUser.displayName || '',
+              displayName: firebaseUser.displayName || null,
               nickname: '',
-              email: firebaseUser.email || '',
-              photoURL: firebaseUser.photoURL || '',
+              email: firebaseUser.email || null,
+              photoURL: firebaseUser.photoURL || null,
               role: 'member',
               graduation: 'Iniciante',
               createdAt: serverTimestamp() as any,
@@ -137,9 +225,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           setLoading(false);
         }, (error) => {
+          console.error('Profile listener error:', error);
           handleFirestoreError(error, OperationType.GET, 'users/' + firebaseUser.uid);
           setLoading(false);
         });
+        unsubs.push(unsubProfile);
 
         // Listen to chat messages
         const q = query(collection(db, 'chats', 'main', 'messages'), orderBy('createdAt', 'desc'), limit(50));
@@ -149,8 +239,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'chats/main/messages');
         });
+        unsubs.push(unsubMessages);
 
-        // Initial gallery fetch (real-time for the first page)
+        // Initial gallery fetch
         const galleryQuery = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'), limit(GALLERY_PAGE_SIZE));
         const unsubGallery = onSnapshot(galleryQuery, (snapshot) => {
           const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
@@ -160,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'gallery');
         });
+        unsubs.push(unsubGallery);
 
         // Listen to events
         const eventsQuery = query(collection(db, 'events'), orderBy('date', 'asc'));
@@ -169,6 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'events');
         });
+        unsubs.push(unsubEvents);
 
         // Listen to store items
         const unsubStore = onSnapshot(collection(db, 'store'), (snapshot) => {
@@ -177,6 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'store');
         });
+        unsubs.push(unsubStore);
 
         // Listen to masters
         const unsubMasters = onSnapshot(collection(db, 'masters'), (snapshot) => {
@@ -185,6 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'masters');
         });
+        unsubs.push(unsubMasters);
 
         // Listen to training logs
         const trainingQuery = query(collection(db, 'trainingLogs'), where('userId', '==', firebaseUser.uid), orderBy('date', 'desc'));
@@ -194,6 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'trainingLogs');
         });
+        unsubs.push(unsubTraining);
 
         // Listen to user's own gallery items
         const userGalleryQuery = query(collection(db, 'gallery'), where('authorUid', '==', firebaseUser.uid), orderBy('createdAt', 'desc'));
@@ -203,18 +299,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'gallery-user');
         });
+        unsubs.push(unsubUserGallery);
 
-        return () => {
-          unsubProfile();
-          unsubMessages();
-          unsubGallery();
-          unsubEvents();
-          unsubStore();
-          unsubMasters();
-          unsubTraining();
-          unsubUserGallery();
-        };
+        // Listen to notifications
+        const notificationsQuery = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(20));
+        const unsubNotifications = onSnapshot(notificationsQuery, (snapshot) => {
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppNotification));
+          setNotifications(items);
+          
+          // Browser notification for new items
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added' && !change.doc.metadata.hasPendingWrites) {
+              const data = change.doc.data() as AppNotification;
+              if (Notification.permission === 'granted') {
+                new Notification(data.title, { body: data.body, icon: '/favicon.ico' });
+              }
+            }
+          });
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, 'notifications');
+        });
+        unsubs.push(unsubNotifications);
+
+        // Listen to branches
+        const unsubBranches = onSnapshot(collection(db, 'branches'), (snapshot) => {
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Branch));
+          setBranches(items);
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, 'branches');
+        });
+        unsubs.push(unsubBranches);
       } else {
+        console.log('User is null, clearing state');
         setProfile(null);
         setMessages([]);
         setGalleryItems([]);
@@ -228,18 +344,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(loadingTimeout);
+      unsubscribeAuth();
+      unsubs.forEach(unsub => unsub());
+    };
   }, []);
 
   useEffect(() => {
-    setIsAdmin(profile?.role === 'admin' || user?.email?.startsWith('andercapo0908'));
-  }, [user, profile?.role]);
+    const isSpecialAdmin = user?.email?.startsWith('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
+    setIsAdmin(profile?.role === 'admin' || isSpecialAdmin);
+  }, [user, profile?.role, profile?.nickname]);
+
+  // Initialize config if missing and user is admin
+  useEffect(() => {
+    if (isAdmin && !appConfig && user) {
+      const defaultConfig: AppConfig = {
+        logoUrl: 'https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png',
+        primaryColor: '#cc0000',
+        fontFamily: 'Black Ops One',
+        activeTabs: ['home', 'gallery', 'calendar', 'store', 'chat', 'masters'],
+        features: {
+          geminiEnabled: true,
+          galleryEnabled: true,
+          storeEnabled: true,
+          chatEnabled: true
+        },
+        version: 1,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      };
+      setDoc(doc(db, 'config', 'current'), defaultConfig).catch(console.error);
+    }
+  }, [isAdmin, appConfig, user]);
 
   // Separate effect for Finance and Admin data to react to profile/isAdmin changes
   useEffect(() => {
     if (!user) return;
 
-    const isAdminUser = profile?.role === 'admin' || user?.email?.startsWith('andercapo0908');
+    const isSpecialAdmin = user?.email?.startsWith('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
+    const isAdminUser = profile?.role === 'admin' || isSpecialAdmin;
 
     // Listen to payments
     const paymentsQuery = isAdminUser 
@@ -357,10 +501,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const uploadProfilePhoto = async (file: File) => {
     if (!user) throw new Error("User not authenticated");
-    const storageRef = ref(storage, `profiles/${user.uid}/${Date.now()}_${file.name}`);
-    const snapshot = await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(snapshot.ref);
-    return url;
+    return uploadFile(file, `profiles/${user.uid}`);
   };
 
   const updateOtherUserProfile = async (userId: string, data: Partial<UserProfile>) => {
@@ -438,12 +579,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const uploadToGallery = async (file: File, description?: string) => {
     if (!user) return;
-    const fileType = file.type.startsWith('video/') ? 'video' : 'image';
-    const storageRef = ref(storage, `gallery/${user.uid}/${Date.now()}_${file.name}`);
+    const isVideo = file.type.startsWith('video/');
+    const fileType = isVideo ? 'video' : 'image';
     
     try {
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
+      const url = await uploadFile(file, `gallery/${user.uid}`);
       
       await addDoc(collection(db, 'gallery'), {
         url,
@@ -532,6 +672,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authorUid: user.uid,
         createdAt: serverTimestamp()
       });
+
+      // Create notification
+      await addDoc(collection(db, 'notifications'), {
+        title: 'Novo Evento!',
+        body: `${eventData.title} foi adicionado à agenda.`,
+        type: 'event',
+        link: 'calendar',
+        createdAt: serverTimestamp(),
+        readBy: []
+      });
     } catch (e) {
       handleFirestoreError(e, OperationType.WRITE, 'events');
     }
@@ -543,6 +693,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await deleteDoc(doc(db, 'events', id));
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'events/' + id);
+    }
+  };
+
+  const updateEvent = async (id: string, data: Partial<CalendarEvent>) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'events', id), data);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'events/' + id);
     }
   };
 
@@ -661,6 +820,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const markNotificationAsRead = async (id: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'notifications', id), {
+        readBy: arrayUnion(user.uid)
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'notifications/' + id);
+    }
+  };
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      await Notification.requestPermission();
+    }
+  };
+
+  const addBranch = async (data: Omit<Branch, 'id' | 'createdAt'>) => {
+    if (!isAdmin) return;
+    try {
+      await addDoc(collection(db, 'branches'), {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'branches');
+    }
+  };
+
+  const deleteBranch = async (id: string) => {
+    if (!isAdmin) return;
+    try {
+      await deleteDoc(doc(db, 'branches', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'branches/' + id);
+    }
+  };
+
+  const updateAppConfig = async (data: Partial<AppConfig>) => {
+    if (!isAdmin || !user) return;
+    try {
+      const currentConfigRef = doc(db, 'config', 'current');
+      const newVersion = (appConfig?.version || 0) + 1;
+      const updatedData = {
+        ...appConfig,
+        ...data,
+        version: newVersion,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      };
+      
+      if (appConfig) {
+        await addDoc(collection(db, 'configHistory'), {
+          config: appConfig,
+          archivedAt: serverTimestamp()
+        });
+      }
+
+      await setDoc(currentConfigRef, updatedData);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'config');
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -686,6 +910,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       getGalleryComments,
       addEvent,
       deleteEvent,
+      updateEvent,
       addPayment,
       updatePaymentStatus,
       deletePayment,
@@ -710,7 +935,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       masters,
       allUsers,
       userGallery,
-      isAdmin
+      notifications,
+      branches,
+      markNotificationAsRead,
+      requestNotificationPermission,
+      addBranch,
+      deleteBranch,
+      isAdmin,
+      appConfig,
+      updateAppConfig,
+      uploadProgress,
+      uploadFile
     }}>
       {children}
     </AuthContext.Provider>

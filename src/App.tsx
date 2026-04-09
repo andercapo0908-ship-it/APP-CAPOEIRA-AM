@@ -12,8 +12,12 @@ import {
   Payment, 
   FeeConfig, 
   Message as ChatMessage,
+  AIChatMessage,
   Language,
-  View
+  View,
+  AppConfig,
+  Graduation,
+  Branch
 } from './types';
 import { storage } from './firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -26,6 +30,7 @@ import {
   Image as ImageIcon, 
   Users, 
   Award, 
+  Bell,
   MapPin, 
   MessageSquare, 
   ShoppingBag, 
@@ -41,6 +46,9 @@ import {
   Smile,
   Send,
   MessageCircle,
+  Sparkles,
+  Palette,
+  Settings,
   X,
   Play,
   Instagram,
@@ -52,8 +60,17 @@ import {
   FileText,
   TrendingUp,
   PieChart as PieChartIcon,
-  Download
+  Download,
+  Volume2,
+  Clock,
+  Phone
 } from 'lucide-react';
+import Markdown from 'react-markdown';
+import { 
+  aiChat, 
+  textToSpeech, 
+  analyzeGalleryContent 
+} from './services/geminiService';
 import { 
   BarChart, 
   Bar, 
@@ -101,6 +118,10 @@ const safeToDate = (date: any): Date => {
 const LazyImage = ({ src, alt, className, objectFit = 'cover', imgClassName = '', wrapperClassName = '' }: { src: string; alt: string; className?: string; objectFit?: 'cover' | 'contain'; imgClassName?: string; wrapperClassName?: string }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
+  useEffect(() => {
+    setIsLoaded(false);
+  }, [src]);
+
   return (
     <div className={`relative overflow-hidden ${className} ${wrapperClassName}`}>
       {!isLoaded && (
@@ -108,35 +129,62 @@ const LazyImage = ({ src, alt, className, objectFit = 'cover', imgClassName = ''
           <ImageIcon className="w-8 h-8 text-zinc-700" />
         </div>
       )}
-      <LazyLoadImage
-        alt={alt}
-        src={src}
-        effect="blur"
-        onLoad={() => setIsLoaded(true)}
-        className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'} ${imgClassName}`}
-        wrapperClassName="w-full h-full"
-      />
+      {src && (
+        <LazyLoadImage
+          alt={alt}
+          src={src}
+          effect="blur"
+          threshold={300}
+          onLoad={() => setIsLoaded(true)}
+          className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'} ${imgClassName}`}
+          wrapperClassName="w-full h-full"
+        />
+      )}
     </div>
   );
 };
 
 const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, autoPlay = false }: { src: string; className?: string; objectFit?: 'cover' | 'contain'; controls?: boolean; autoPlay?: boolean }) => {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const videoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    if (videoRef.current) {
+      observer.observe(videoRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className={`relative overflow-hidden ${className}`}>
+    <div ref={videoRef} className={`relative overflow-hidden ${className}`}>
       {!isLoaded && (
         <div className="absolute inset-0 bg-zinc-800 animate-pulse flex items-center justify-center">
           <Play className="w-8 h-8 text-zinc-700" />
         </div>
       )}
-      <video 
-        src={src} 
-        onLoadedData={() => setIsLoaded(true)}
-        controls={controls}
-        autoPlay={autoPlay}
-        className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-      />
+      {isInView && src && (
+        <video 
+          src={src} 
+          onLoadedData={() => setIsLoaded(true)}
+          controls={controls}
+          autoPlay={autoPlay}
+          muted={autoPlay}
+          playsInline
+          className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        />
+      )}
     </div>
   );
 };
@@ -173,7 +221,7 @@ const Button = ({
     secondary: "bg-incendeia-orange hover:bg-orange-600",
     danger: "bg-zinc-800 hover:bg-zinc-700 border border-incendeia-red/30",
   };
-  const size = small ? "px-3 py-1 text-[10px] rounded-lg" : "px-8 py-3 text-lg rounded-xl";
+  const size = small ? "px-2.5 py-1 text-[9px] rounded-lg" : "px-6 py-2.5 text-base rounded-xl";
   
   return (
     <button 
@@ -240,9 +288,9 @@ const InkButton = ({
   return (
     <button 
       onClick={handleClick}
-      className={`distressed-red ${small ? 'py-2 px-6' : 'py-4 px-10'} rounded-full transition-all active:scale-95 group relative overflow-hidden ${className}`}
+      className={`distressed-red ${small ? 'py-1.5 px-5' : 'py-3 px-8'} rounded-full transition-all active:scale-95 group relative overflow-hidden ${className}`}
     >
-      <span className={`relative z-20 ${small ? 'text-sm' : 'text-2xl'} font-black-ops text-white uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]`}>
+      <span className={`relative z-20 ${small ? 'text-xs' : 'text-xl'} font-black-ops text-white uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]`}>
         {children}
       </span>
       {jaguar && (
@@ -330,10 +378,6 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode }: {
           />
         </div>
         <div className="flex flex-col items-center gap-0">
-          <h1 className="text-4xl font-black-ops tracking-tighter text-center flex items-center gap-3">
-            <span className="text-flag-br">INCENDEIA</span>
-            <span className="text-flag-es">CAPOEIRA</span>
-          </h1>
           <p className="text-zinc-500 font-bold text-[10px] uppercase tracking-[0.4em] mt-2">{t('ENERGIA QUE CONTAGIA', 'ENERGÍA QUE CONTAGIA')}</p>
         </div>
       </div>
@@ -373,47 +417,10 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
   setAuthMode: (mode: 'login' | 'register') => void; 
   handleAuth: (nickname: string, password: string, photoURL?: string) => Promise<string | null>; 
 }) => {
-  const { uploadProfilePhoto } = useAuth();
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
-  const [photoURL, setPhotoURL] = useState('');
   const [authError, setAuthError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setAuthError('');
-    try {
-      // For registration, we don't have a user yet, so we can't use uploadProfilePhoto if it requires user.uid
-      // Wait, uploadProfilePhoto in AuthContext uses user.uid.
-      // If we are registering, we don't have a user yet.
-      // I should modify uploadProfilePhoto to take an optional uid or handle registration case.
-      // Actually, I can just upload it to a temporary path or use a different function.
-      // But the user said "obrigatório" for the photo.
-      // Maybe I should upload it AFTER the user is created?
-      // But the register function takes the photoURL.
-      // Let's modify uploadProfilePhoto to handle registration by using a temporary ID or just the nickname.
-      // Or better, I'll add a separate function for uploading before registration.
-      
-      // Actually, I'll modify uploadProfilePhoto in AuthContext to not require user.uid if we pass one.
-      // Or I'll just use a generic path for registration photos.
-      
-      const storageRef = ref(storage, `temp_profiles/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      setPhotoURL(url);
-    } catch (error) {
-      console.error("Error uploading photo:", error);
-      setAuthError(t('Erro ao carregar foto', 'Error al cargar foto'));
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const onSubmit = async () => {
     setAuthError('');
@@ -429,13 +436,8 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
       return;
     }
 
-    if (authMode === 'register' && authRole === 'admin' && !photoURL) {
-      setAuthError(t('A foto de perfil é obrigatória para administradores', 'La foto de perfil es obligatoria para administradores'));
-      return;
-    }
-
     setIsSubmitting(true);
-    const error = await handleAuth(nickname, password, photoURL);
+    const error = await handleAuth(nickname, password);
     if (error) {
       setAuthError(error);
     }
@@ -459,14 +461,6 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
             imgClassName="mix-blend-screen drop-shadow-[0_0_15px_rgba(204,0,0,0.4)]"
             objectFit="contain"
           />
-          <div className="flex flex-row items-center gap-2 mt-4">
-            <div className="px-4 py-1 bg-incendeia-red rounded-lg border border-white/20 shadow-lg">
-              <span className="text-xl font-black-ops text-white tracking-tight">INCENDEIA</span>
-            </div>
-            <div className="px-4 py-1 bg-zinc-800 rounded-lg border border-white/20 shadow-lg">
-              <span className="text-xl font-black-ops text-white tracking-tight">CAPOEIRA</span>
-            </div>
-          </div>
         </div>
 
         <div className="flex gap-2 mb-6 bg-zinc-900/80 p-1 rounded-2xl border border-white/5">
@@ -491,42 +485,6 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
         </div>
 
         <div className="flex flex-col gap-6 bg-zinc-900/50 p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
-          {authMode === 'register' && (
-            <div className="flex flex-col items-center gap-4 mb-2">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`w-24 h-24 rounded-full border-2 border-dashed ${photoURL ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group`}
-              >
-                {photoURL ? (
-                  <img src={photoURL} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  <div className="flex flex-col items-center text-zinc-500">
-                    <Camera className="w-8 h-8 mb-1" />
-                    <span className="text-[8px] font-bold uppercase tracking-tighter">{t('FOTO PERFIL', 'FOTO PERFIL')}</span>
-                  </div>
-                )}
-                {isUploading && (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                className="hidden" 
-                accept="image/*"
-              />
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                {photoURL ? t('FOTO CARREGADA', 'FOTO CARGADA') : (authRole === 'admin' ? t('FOTO OBRIGATÓRIA', 'FOTO OBLIGATORIA') : t('FOTO OPCIONAL', 'FOTO OPCIONAL'))}
-              </p>
-            </div>
-          )}
-
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('APELIDO', 'APODO')}</label>
             <input 
@@ -562,20 +520,28 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
   );
 };
 
-const HomeView = ({ t, setView, profile, hasNewMessages }: { 
+const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin }: { 
   t: (pt: string, es: string) => string; 
   setView: (view: View) => void; 
   profile: UserProfile | null; 
   hasNewMessages: boolean; 
+  isAdmin: boolean;
 }) => {
   const menuItems = [
     { title: t('MEU PERFIL', 'MI PERFIL'), icon: User, onClick: () => setView('profile') },
     { title: t('GALERIA', 'GALERIA'), icon: ImageIcon, onClick: () => setView('gallery') },
     { title: t('MESTRES', 'MAESTROS'), icon: Users, onClick: () => setView('masters') },
     { title: t('CHAT', 'CHAT'), icon: MessageSquare, onClick: () => setView('chat'), hasNotification: hasNewMessages },
+    { title: t('GRADUAÇÕES', 'GRADUACIONES'), icon: Award, onClick: () => setView('graduations') },
+    { title: t('FILIAIS', 'FILIALES'), icon: MapPin, onClick: () => setView('branches') },
     { title: t('LOCAIS', 'LUGARES'), icon: MapPin, onClick: () => setView('calendar') },
     { title: t('LOJA', 'TIENDA'), icon: ShoppingBag, onClick: () => setView('store') },
+    { title: t('IA ASSISTENTE', 'IA ASISTENTE'), icon: Sparkles, onClick: () => setView('ai-chat') },
   ];
+
+  if (isAdmin) {
+    menuItems.push({ title: t('PAINEL ADM', 'PANEL ADM'), icon: Settings, onClick: () => setView('admin-panel') });
+  }
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6 relative overflow-hidden">
@@ -651,12 +617,13 @@ const HomeView = ({ t, setView, profile, hasNewMessages }: {
   );
 };
 
-const ProfileView = ({ t, setView, profile, logout, showConfirm }: { 
+const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: { 
   t: (pt: string, es: string) => string; 
   setView: (view: View) => void; 
   profile: UserProfile | null; 
   logout: () => void; 
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
+  isAdmin: boolean;
 }) => {
   const { trainingLogs, addTrainingLog, userGallery, uploadToGallery, deleteGalleryItem, user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -930,6 +897,12 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm }: {
         </div>
 
         <div className="flex flex-col gap-4">
+          {isAdmin && (
+            <InkButton t={t} onClick={() => setView('admin-panel')} className="w-full bg-zinc-800 border-incendeia-red/30">
+              <Settings className="w-5 h-5 mr-2" />
+              {t('PAINEL ADMINISTRATIVO', 'PANEL ADMINISTRATIVO')}
+            </InkButton>
+          )}
           <InkButton t={t} onClick={() => setView('edit-profile')} className="w-full">{t('EDITAR PERFIL', 'EDITAR PERFIL')}</InkButton>
           <button onClick={logout} className="w-full py-4 text-zinc-500 font-bold uppercase text-xs hover:text-red-500 transition-colors flex items-center justify-center gap-2">
             <LogOut className="w-4 h-4" />
@@ -941,13 +914,14 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm }: {
   );
 };
 
-const EditProfileView = ({ t, initialData, handleSaveProfile, setView }: { 
+const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert }: { 
   t: (pt: string, es: string) => string; 
   initialData: UserProfile; 
   handleSaveProfile: (data: UserProfile) => Promise<void>; 
   setView: (view: View) => void; 
+  showAlert: (message: string) => void;
 }) => {
-  const { uploadProfilePhoto } = useAuth();
+  const { uploadProfilePhoto, uploadProgress } = useAuth();
   const [editData, setEditData] = useState(initialData);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -960,8 +934,10 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView }: {
     try {
       const url = await uploadProfilePhoto(file);
       setEditData({ ...editData, photoURL: url });
+      showAlert(t('Foto carregada com sucesso! Clique em salvar para confirmar.', '¡Foto cargada con éxito! Haga clic en guardar para confirmar.'));
     } catch (error) {
       console.error("Error uploading photo:", error);
+      showAlert(t('Erro ao carregar foto.', 'Error al cargar la foto.'));
     } finally {
       setIsUploading(false);
     }
@@ -975,8 +951,17 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView }: {
           <div className="w-32 h-32 rounded-full border-4 border-incendeia-red p-1 relative overflow-hidden">
             <img src={editData.photoURL || "https://picsum.photos/seed/capoeira-user/200/200"} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
             {isUploading && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin" />
+              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
+                <div className="w-8 h-8 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                {uploadProgress > 0 && (
+                  <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      className="h-full bg-incendeia-red"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -991,10 +976,9 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView }: {
             variant="danger" 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="text-xs"
-            small
+            className="text-sm px-8 py-3"
           >
-            <Camera className="w-4 h-4 mr-2" />
+            <Camera className="w-5 h-5 mr-2" />
             {t('ALTERAR FOTO', 'CAMBIAR FOTO')}
           </Button>
         </div>
@@ -1078,7 +1062,7 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   showAlert: (message: string) => void; 
 }) => {
-  const { galleryItems, uploadToGallery, loadMoreGallery, hasMoreGallery, likeGalleryItem, reactToGalleryItem, commentOnGalleryItem, getGalleryComments, user, deleteGalleryItem } = useAuth();
+  const { galleryItems, uploadToGallery, loadMoreGallery, hasMoreGallery, likeGalleryItem, reactToGalleryItem, commentOnGalleryItem, getGalleryComments, user, deleteGalleryItem, uploadProgress } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -1110,6 +1094,7 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadDescription, setUploadDescription] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1117,6 +1102,22 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
     if (!file) return;
     setPendingFile(file);
     setShowUploadModal(true);
+  };
+
+  const handleAIAnalyze = async () => {
+    if (!pendingFile || pendingFile.type.startsWith('video/')) return;
+    setIsAnalyzing(true);
+    try {
+      // We need a temporary URL to analyze the image
+      const tempUrl = URL.createObjectURL(pendingFile);
+      const description = await analyzeGalleryContent(tempUrl);
+      setUploadDescription(description);
+      URL.revokeObjectURL(tempUrl);
+    } catch (error) {
+      console.error("AI Analysis failed:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleUpload = async () => {
@@ -1166,6 +1167,23 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
           accept="image/*,video/*"
         />
       </div>
+
+      {/* Upload Progress Bar (Global) */}
+      {isUploading && uploadProgress > 0 && (
+        <div className="mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-white/5 overflow-hidden">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{t('ENVIANDO MÍDIA...', 'ENVIANDO MEDIA...')}</span>
+            <span className="text-[8px] font-bold text-incendeia-red">{Math.round(uploadProgress)}%</span>
+          </div>
+          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${uploadProgress}%` }}
+              className="h-full bg-incendeia-red"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
@@ -1258,7 +1276,19 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
               </div>
 
               <div className="flex flex-col gap-2 mb-8">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('DESCRIÇÃO', 'DESCRIPCIÓN')}</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('DESCRIÇÃO', 'DESCRIPCIÓN')}</label>
+                  {pendingFile?.type.startsWith('image/') && (
+                    <button 
+                      onClick={handleAIAnalyze}
+                      disabled={isAnalyzing}
+                      className="text-[10px] font-bold text-incendeia-red uppercase tracking-widest flex items-center gap-1 hover:underline disabled:opacity-50"
+                    >
+                      {isAnalyzing ? <div className="w-3 h-3 border border-incendeia-red border-t-transparent rounded-full animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      {t('GERAR COM IA', 'GENERAR CON IA')}
+                    </button>
+                  )}
+                </div>
                 <textarea 
                   value={uploadDescription}
                   onChange={e => setUploadDescription(e.target.value)}
@@ -1481,8 +1511,14 @@ const GalleryItemDetail = ({
           </div>
 
           {item.description && (
-            <div className="bg-black/30 p-4 rounded-2xl border border-white/5 mb-8">
-              <p className="text-zinc-300 text-sm leading-relaxed">{item.description}</p>
+            <div className="bg-black/30 p-4 rounded-2xl border border-white/5 mb-8 flex justify-between items-start gap-4">
+              <p className="text-zinc-300 text-sm leading-relaxed flex-1">{item.description}</p>
+              <button 
+                onClick={() => textToSpeech(item.description).then(url => url && new Audio(url).play())}
+                className="p-2 bg-zinc-800 rounded-xl hover:bg-incendeia-red/20 transition-colors shrink-0"
+              >
+                <Volume2 className="w-4 h-4 text-zinc-500" />
+              </button>
             </div>
           )}
 
@@ -1552,11 +1588,13 @@ const MastersView = ({ t, showConfirm }: {
   t: (pt: string, es: string) => string; 
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
 }) => {
-  const { masters, isAdmin, addMaster, updateMaster, deleteMaster } = useAuth();
+  const { masters, isAdmin, addMaster, updateMaster, deleteMaster, uploadFile, uploadProgress } = useAuth();
   const [selectedMaster, setSelectedMaster] = useState<Master | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMasterId, setEditingMasterId] = useState<string | null>(null);
   const [newMaster, setNewMaster] = useState<Omit<Master, 'id'>>({ name: '', role: '', bio: '', photoURL: '', instagram: '', website: '' });
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddMaster = async () => {
     if (!newMaster.name || !newMaster.role) return;
@@ -1568,6 +1606,21 @@ const MastersView = ({ t, showConfirm }: {
     setShowAddModal(false);
     setEditingMasterId(null);
     setNewMaster({ name: '', role: '', bio: '', photoURL: '', instagram: '', website: '' });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const url = await uploadFile(file, 'masters');
+      setNewMaster(prev => ({ ...prev, photoURL: url }));
+    } catch (error) {
+      console.error("Error uploading master photo:", error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleEditMaster = (m: Master, e: React.MouseEvent) => {
@@ -1667,6 +1720,45 @@ const MastersView = ({ t, showConfirm }: {
               <h3 className="text-xl font-black-ops text-white uppercase mb-6">{editingMasterId ? t('EDITAR MESTRE', 'EDITAR MAESTRO') : t('NOVO MESTRE', 'NUEVO MAESTRO')}</h3>
               
               <div className="flex flex-col gap-4">
+                <div className="flex flex-col items-center gap-3 mb-2">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-32 h-32 rounded-full border-2 border-dashed ${newMaster.photoURL ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                  >
+                    {newMaster.photoURL ? (
+                      <img src={newMaster.photoURL || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="flex flex-col items-center text-zinc-500">
+                        <Camera className="w-8 h-8 mb-1" />
+                        <span className="text-[8px] font-bold uppercase tracking-tighter">{t('FOTO DO MESTRE', 'FOTO DEL MAESTRO')}</span>
+                      </div>
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              className="h-full bg-incendeia-red"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Plus className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept="image/*"
+                  />
+                </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('NOME', 'NOMBRE')}</label>
                   <input 
@@ -1829,14 +1921,17 @@ const CalendarView = ({ t, showConfirm }: {
   t: (pt: string, es: string) => string; 
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
 }) => {
-  const { events, addEvent, deleteEvent, user, isAdmin } = useAuth();
+  const { events, addEvent, deleteEvent, user, isAdmin, uploadFile, uploadProgress } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newEvent, setNewEvent] = useState<Omit<CalendarEvent, 'id'>>({
     title: '',
     description: '',
     date: '' as any,
     location: '',
-    type: 'training'
+    type: 'training',
+    imageUrl: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1848,7 +1943,21 @@ const CalendarView = ({ t, showConfirm }: {
       date: new Date(newEvent.date)
     });
     setIsAdding(false);
-    setNewEvent({ title: '', description: '', date: '', location: '', type: 'training' });
+    setNewEvent({ title: '', description: '', date: '', location: '', type: 'training', imageUrl: '' });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadFile(file, 'events');
+      setNewEvent(prev => ({ ...prev, imageUrl: url }));
+    } catch (error) {
+      console.error("Error uploading event image:", error);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const getEventIcon = (type: string) => {
@@ -1890,33 +1999,55 @@ const CalendarView = ({ t, showConfirm }: {
           </div>
         ) : (
           events.map(event => (
-            <div key={event.id} className="bg-zinc-900/50 p-5 rounded-3xl border border-white/5 flex gap-5">
-              <div className="flex flex-col items-center justify-center bg-zinc-800/50 rounded-2xl p-3 min-w-[60px]">
-                <span className="text-xs font-bold text-incendeia-red uppercase">{format(event.date.toDate(), 'MMM', { locale: ptBR })}</span>
-                <span className="text-2xl font-black-ops text-white">{format(event.date.toDate(), 'dd')}</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  {getEventIcon(event.type)}
-                  <h3 className="text-lg font-bold text-white leading-tight">{event.title}</h3>
+            <div key={event.id} className="bg-zinc-900/50 rounded-3xl border border-white/5 overflow-hidden flex flex-col">
+              {event.imageUrl && (
+                <div className="w-full h-40 relative">
+                  <LazyImage src={event.imageUrl} alt={event.title} className="w-full h-full" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 to-transparent" />
                 </div>
-                <p className="text-zinc-400 text-xs mb-3">{event.description}</p>
-                <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {event.location}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Award className="w-3 h-3" />
-                    {event.type}
-                  </div>
-                </div>
-              </div>
-              {isAdmin && (
-                <button onClick={() => handleDeleteEvent(event.id)} className="text-zinc-600 hover:text-red-500 transition-colors">
-                  <Trash className="w-5 h-5" />
-                </button>
               )}
+              <div className="p-5 flex gap-5">
+                <div className="flex flex-col items-center justify-center bg-zinc-800/50 rounded-2xl p-3 min-w-[60px] h-fit">
+                  <span className="text-xs font-bold text-incendeia-red uppercase">{format(event.date.toDate(), 'MMM', { locale: ptBR })}</span>
+                  <span className="text-2xl font-black-ops text-white">{format(event.date.toDate(), 'dd')}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {getEventIcon(event.type)}
+                    <h3 className="text-lg font-bold text-white leading-tight">{event.title}</h3>
+                  </div>
+                  <div className="flex flex-col gap-2 mb-3">
+                    <p className="text-zinc-400 text-xs leading-relaxed">{event.description}</p>
+                    <button 
+                      onClick={() => textToSpeech(event.description).then(url => url && new Audio(url).play())}
+                      className="flex items-center gap-1 text-[8px] font-bold text-zinc-600 uppercase tracking-widest hover:text-incendeia-red transition-colors w-fit"
+                    >
+                      <Volume2 className="w-3 h-3" />
+                      {t('OUVIR DESCRIÇÃO', 'ESCUCHAR DESCRIPCIÓN')}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:text-incendeia-red transition-colors"
+                    >
+                      <MapPin className="w-3 h-3" />
+                      {event.location}
+                    </a>
+                    <div className="flex items-center gap-1">
+                      <Award className="w-3 h-3" />
+                      {event.type}
+                    </div>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <button onClick={() => handleDeleteEvent(event.id)} className="text-zinc-600 hover:text-red-500 transition-colors h-fit">
+                    <Trash className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </div>
           ))
         )}
@@ -1927,9 +2058,45 @@ const CalendarView = ({ t, showConfirm }: {
         {isAdding && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="fixed inset-0 bg-black/80 z-[100] backdrop-blur-sm" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed bottom-0 left-0 right-0 bg-zinc-900 z-[110] rounded-t-[40px] p-8 border-t border-incendeia-red/20">
+            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed bottom-0 left-0 right-0 bg-zinc-900 z-[110] rounded-t-[40px] p-8 border-t border-incendeia-red/20 max-h-[90vh] overflow-y-auto">
               <h3 className="text-xl font-black-ops text-white mb-6 uppercase tracking-widest">{t('NOVO EVENTO', 'NUEVO EVENTO')}</h3>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <div className="flex flex-col items-center gap-3 mb-2">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full h-40 rounded-2xl border-2 border-dashed ${newEvent.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                  >
+                    {newEvent.imageUrl ? (
+                      <img src={newEvent.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="flex flex-col items-center text-zinc-500">
+                        <Camera className="w-8 h-8 mb-1" />
+                        <span className="text-[8px] font-bold uppercase tracking-tighter">{t('FOTO DO EVENTO', 'FOTO DEL EVENTO')}</span>
+                      </div>
+                    )}
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              className="h-full bg-incendeia-red"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept="image/*"
+                  />
+                </div>
                 <input 
                   type="text" 
                   placeholder={t('Título do evento', 'Título del evento')}
@@ -1985,7 +2152,7 @@ const StoreView = ({ t, showConfirm, showAlert }: {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   showAlert: (message: string) => void; 
 }) => {
-  const { storeItems, isAdmin, addStoreItem, updateStoreItem, deleteStoreItem } = useAuth();
+  const { storeItems, isAdmin, addStoreItem, updateStoreItem, deleteStoreItem, uploadFile, uploadProgress } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState<Omit<StoreItem, 'id'>>({ name: '', price: 0, imageUrl: '', category: 'Geral', description: '' });
@@ -2014,9 +2181,7 @@ const StoreView = ({ t, showConfirm, showAlert }: {
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `store/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
+      const url = await uploadFile(file, 'store');
       setNewItem(prev => ({ ...prev, imageUrl: url }));
     } catch (error) {
       console.error("Error uploading store image:", error);
@@ -2115,7 +2280,7 @@ const StoreView = ({ t, showConfirm, showAlert }: {
                     className={`w-32 h-32 rounded-2xl border-2 border-dashed ${newItem.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
                   >
                     {newItem.imageUrl ? (
-                      <img src={newItem.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={newItem.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-500">
                         <Camera className="w-8 h-8 mb-1" />
@@ -2123,8 +2288,17 @@ const StoreView = ({ t, showConfirm, showAlert }: {
                       </div>
                     )}
                     {isUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin" />
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              className="h-full bg-incendeia-red"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -2225,7 +2399,7 @@ const StoreView = ({ t, showConfirm, showAlert }: {
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="aspect-square w-full relative">
                   <img 
-                    src={selectedItem.imageUrl} 
+                    src={selectedItem.imageUrl || null} 
                     alt={selectedItem.name} 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
@@ -2749,6 +2923,601 @@ const FinanceView = ({ t, showConfirm, showAlert }: { t: (pt: string, es: string
   );
 };
 
+const CordIcon = ({ colors, size = "md", animated = true }: { colors: string[], size?: "sm" | "md" | "lg", animated?: boolean }) => {
+  const sizeClasses = {
+    sm: "w-8 h-8",
+    md: "w-16 h-16",
+    lg: "w-24 h-24"
+  };
+
+  return (
+    <div className={`${sizeClasses[size]} relative flex items-center justify-center`}>
+      <motion.div 
+        animate={animated ? { 
+          rotate: [0, 5, -5, 0],
+          scale: [1, 1.05, 0.95, 1]
+        } : {}}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        className="w-full h-full relative"
+      >
+        {/* Simple 3D Cord Representation using SVG */}
+        <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-2xl">
+          <defs>
+            <linearGradient id="cordGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
+              <stop offset="50%" stopColor="rgba(0,0,0,0.1)" />
+              <stop offset="100%" stopColor="rgba(255,255,255,0.2)" />
+            </linearGradient>
+          </defs>
+          
+          {/* Twisted Rope Effect */}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <motion.path
+              key={i}
+              d={`M 20,${40 + i * 10} Q 50,${20 + i * 10} 80,${40 + i * 10} T 20,${60 + i * 10}`}
+              fill="none"
+              stroke={colors[i % colors.length]}
+              strokeWidth="12"
+              strokeLinecap="round"
+              className="opacity-90"
+              animate={animated ? {
+                strokeDashoffset: [0, 100],
+              } : {}}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            />
+          ))}
+          
+          {/* Overlay for 3D depth */}
+          <path
+            d="M 20,40 Q 50,20 80,40 T 20,60 T 80,80"
+            fill="none"
+            stroke="url(#cordGradient)"
+            strokeWidth="14"
+            strokeLinecap="round"
+            className="mix-blend-overlay"
+          />
+        </svg>
+      </motion.div>
+    </div>
+  );
+};
+
+const GraduationsView = ({ t }: { t: (pt: string, es: string) => string }) => {
+  const graduations: Graduation[] = [
+    { id: '1', name: 'Crua', colors: ['#f5f5dc'], level: 'aluno', meaning: 'Início da jornada', description: 'Representa a pureza e o potencial do aluno que está começando.' },
+    { id: '2', name: 'Crua e Amarelo', colors: ['#f5f5dc', '#fbbf24'], level: 'aluno', meaning: 'Transição', description: 'O aluno começa a absorver os primeiros fundamentos.' },
+    { id: '3', name: 'Amarelo', colors: ['#fbbf24'], level: 'aluno', meaning: 'Ouro', description: 'Representa a riqueza do aprendizado inicial.' },
+    { id: '4', name: 'Amarelo e Laranja', colors: ['#fbbf24', '#f97316'], level: 'aluno', meaning: 'Crescimento', description: 'Evolução técnica e rítmica.' },
+    { id: '5', name: 'Laranja', colors: ['#f97316'], level: 'aluno', meaning: 'Sol', description: 'O despertar da consciência na capoeira.' },
+    { id: '6', name: 'Laranja e Azul', colors: ['#f97316', '#3b82f6'], level: 'aluno', meaning: 'Maturidade de Aluno', description: 'Preparação para o nível graduado.' },
+    
+    { id: '7', name: 'Azul', colors: ['#3b82f6'], level: 'graduado', meaning: 'Oceano', description: 'Imensidão do conhecimento adquirido.' },
+    { id: '8', name: 'Azul e Verde', colors: ['#3b82f6', '#22c55e'], level: 'graduado', meaning: 'Floresta e Mar', description: 'Equilíbrio entre técnica e natureza.' },
+    { id: '9', name: 'Verde', colors: ['#22c55e'], level: 'graduado', meaning: 'Esperança', description: 'Continuidade e vigor no grupo.' },
+    { id: '10', name: 'Verde e Roxa', colors: ['#22c55e', '#a855f7'], level: 'graduado', meaning: 'Reflexão', description: 'Transição para o ensino.' },
+    
+    { id: '11', name: 'Roxa', colors: ['#a855f7'], level: 'instrutor', meaning: 'Ametista', description: 'Espiritualidade e dedicação ao ensino.' },
+    { id: '12', name: 'Roxa e Marrom', colors: ['#a855f7', '#78350f'], level: 'instrutor', meaning: 'Transição Técnica', description: 'Aprofundamento nos fundamentos.' },
+    
+    { id: '13', name: 'Marrom', colors: ['#78350f'], level: 'professor', meaning: 'Terra', description: 'Solidez, base forte e liderança.' },
+    
+    { id: '14', name: 'Marrom e Vermelha', colors: ['#78350f', '#ef4444'], level: 'mestrando', meaning: 'Fogo e Terra', description: 'A chama da sabedoria começando a arder.' },
+    
+    { id: '15', name: 'Vermelha', colors: ['#ef4444'], level: 'mestre', meaning: 'Rubi', description: 'O ápice da sabedoria, o sangue que corre no grupo.' },
+  ];
+
+  const levels = ['aluno', 'graduado', 'instrutor', 'professor', 'mestrando', 'mestre'];
+
+  return (
+    <div className="p-6 pb-24">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="bg-incendeia-red/20 p-2 rounded-xl">
+          <Award className="w-6 h-6 text-incendeia-red" />
+        </div>
+        <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('GRADUAÇÕES', 'GRADUACIONES')}</h2>
+      </div>
+
+      <div className="flex flex-col gap-10">
+        {levels.map(level => {
+          const levelGrads = graduations.filter(g => g.level === level);
+          if (levelGrads.length === 0) return null;
+
+          return (
+            <div key={level} className="flex flex-col gap-4">
+              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-[0.3em] border-l-2 border-incendeia-red pl-3 ml-1">
+                {level}
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                {levelGrads.map(g => (
+                  <motion.div 
+                    key={g.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="bg-zinc-900/50 backdrop-blur-md border border-white/5 p-4 rounded-[24px] flex items-center gap-6"
+                  >
+                    <CordIcon colors={g.colors} size="md" />
+                    <div className="flex-1">
+                      <h4 className="text-white font-black-ops text-sm uppercase mb-1">{g.name}</h4>
+                      <p className="text-incendeia-red text-[9px] font-bold uppercase tracking-widest mb-2">{g.meaning}</p>
+                      <p className="text-zinc-400 text-[11px] leading-relaxed italic">{g.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => string, showConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
+  const { branches, isAdmin, deleteBranch } = useAuth();
+  const [showAdd, setShowAdd] = useState(false);
+
+  return (
+    <div className="p-6 pb-24">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="bg-incendeia-red/20 p-2 rounded-xl">
+            <MapPin className="w-6 h-6 text-incendeia-red" />
+          </div>
+          <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('FILIAIS', 'FILIALES')}</h2>
+        </div>
+        {isAdmin && (
+          <button 
+            onClick={() => setShowAdd(true)}
+            className="bg-incendeia-red p-2 rounded-xl text-white shadow-lg shadow-incendeia-red/20"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-6">
+        {branches.length === 0 ? (
+          <div className="text-center py-20 bg-zinc-900/30 rounded-[32px] border border-dashed border-white/5">
+            <MapPin className="w-12 h-12 text-zinc-800 mx-auto mb-4 opacity-20" />
+            <p className="text-xs font-bold text-zinc-600 uppercase tracking-widest">{t('Nenhuma filial cadastrada', 'Ninguna filial registrada')}</p>
+          </div>
+        ) : (
+          branches.map(b => (
+            <motion.div 
+              key={b.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="bg-zinc-900/80 backdrop-blur-md border border-white/10 rounded-[32px] overflow-hidden shadow-2xl group"
+            >
+              <div className="h-48 relative">
+                <LazyImage src={b.imageUrl} alt={b.name} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent" />
+                {isAdmin && (
+                  <button 
+                    onClick={() => showConfirm(t('EXCLUIR FILIAL', 'ELIMINAR FILIAL'), t('Deseja excluir esta filial?', '¿Desea eliminar esta filial?'), () => deleteBranch(b.id))}
+                    className="absolute top-4 right-4 bg-black/60 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              <div className="p-6">
+                <h3 className="text-xl font-black-ops text-white uppercase mb-4">{b.name}</h3>
+                
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <MapPin className="w-4 h-4 text-incendeia-red" />
+                    <span className="text-xs">{b.location}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <Calendar className="w-4 h-4 text-incendeia-red" />
+                    <span className="text-xs">{b.trainingDays.join(', ')}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <Clock className="w-4 h-4 text-incendeia-red" />
+                    <span className="text-xs">{b.trainingHours}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-zinc-400">
+                    <Phone className="w-4 h-4 text-incendeia-red" />
+                    <span className="text-xs">{b.contact}</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex gap-3">
+                  <a 
+                    href={b.mapUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="flex-1 bg-incendeia-red text-white text-center py-3 rounded-xl font-black-ops text-xs uppercase tracking-widest hover:bg-red-700 transition-colors"
+                  >
+                    {t('VER NO MAPA', 'VER EN MAPA')}
+                  </a>
+                  <a 
+                    href={`tel:${b.contact}`}
+                    className="p-3 bg-zinc-800 rounded-xl text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      {/* Add Branch Modal */}
+      <AnimatePresence>
+        {showAdd && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowAdd(false)}
+              className="fixed inset-0 bg-black/80 z-[100] backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-zinc-900 z-[110] rounded-[32px] border border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
+            >
+              <h3 className="text-xl font-black-ops text-white uppercase mb-6">{t('NOVA FILIAL', 'NUEVA FILIAL')}</h3>
+              <BranchForm 
+                onClose={() => setShowAdd(false)} 
+                t={t}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const BranchForm = ({ onClose, t }: { onClose: () => void; t: (pt: string, es: string) => string }) => {
+  const { addBranch, uploadFile, uploadProgress } = useAuth();
+  const [isUploading, setIsUploading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    imageUrl: '',
+    mapUrl: '',
+    contact: '',
+    trainingDays: [] as string[],
+    trainingHours: '',
+    location: ''
+  });
+
+  const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadFile(file, 'branches');
+      setFormData(prev => ({ ...prev, imageUrl: url }));
+    } catch (error) {
+      console.error("Error uploading branch photo:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.imageUrl) return alert(t('Por favor, suba uma imagem', 'Por favor, suba una imagen'));
+    await addBranch(formData);
+    onClose();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('NOME', 'NOMBRE')}</label>
+        <input 
+          type="text" required value={formData.name}
+          onChange={e => setFormData({...formData, name: e.target.value})}
+          className="bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('IMAGEM', 'IMAGEN')}</label>
+        <div className="relative group aspect-video bg-black/50 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center">
+          {formData.imageUrl ? (
+            <img src={formData.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <Camera className="w-8 h-8 text-zinc-700" />
+          )}
+          <input 
+            type="file" accept="image/*" onChange={handleFileChange}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+          {isUploading && (
+            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
+              <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+              <span className="text-[10px] text-white font-bold">{Math.round(uploadProgress)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('LOCALIZAÇÃO', 'UBICACIÓN')}</label>
+        <input 
+          type="text" required value={formData.location}
+          onChange={e => setFormData({...formData, location: e.target.value})}
+          className="bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+          placeholder="Ex: São Paulo, SP"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('URL DO MAPA', 'URL DEL MAPA')}</label>
+        <input 
+          type="text" required value={formData.mapUrl}
+          onChange={e => setFormData({...formData, mapUrl: e.target.value})}
+          className="bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+          placeholder="Google Maps URL"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('CONTATO', 'CONTACTO')}</label>
+        <input 
+          type="text" required value={formData.contact}
+          onChange={e => setFormData({...formData, contact: e.target.value})}
+          className="bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+          placeholder="+55..."
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('DIAS DE TREINO', 'DÍAS DE ENTRENAMIENTO')}</label>
+        <div className="flex flex-wrap gap-2">
+          {days.map(day => (
+            <button
+              key={day} type="button"
+              onClick={() => {
+                const newDays = formData.trainingDays.includes(day)
+                  ? formData.trainingDays.filter(d => d !== day)
+                  : [...formData.trainingDays, day];
+                setFormData({...formData, trainingDays: newDays});
+              }}
+              className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${formData.trainingDays.includes(day) ? 'bg-incendeia-red text-white' : 'bg-zinc-800 text-zinc-500'}`}
+            >
+              {day}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('HORÁRIO', 'HORARIO')}</label>
+        <input 
+          type="text" required value={formData.trainingHours}
+          onChange={e => setFormData({...formData, trainingHours: e.target.value})}
+          className="bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+          placeholder="Ex: 19:00 - 21:00"
+        />
+      </div>
+
+      <button 
+        type="submit" disabled={isUploading}
+        className="bg-incendeia-red text-white font-black-ops py-4 rounded-xl mt-4 uppercase tracking-widest shadow-lg shadow-incendeia-red/20 disabled:opacity-50"
+      >
+        {t('SALVAR FILIAL', 'GUARDAR FILIAL')}
+      </button>
+    </form>
+  );
+};
+
+const NotificationsView = ({ setView, t }: { setView: (view: View) => void; t: (pt: string, es: string) => string }) => {
+  const { notifications, markNotificationAsRead, user } = useAuth();
+
+  return (
+    <div className="p-6 pb-24">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('NOTIFICAÇÕES', 'NOTIFICACIONES')}</h2>
+          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{t('Mural de Avisos e Eventos', 'Mural de Avisos y Eventos')}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {notifications.length === 0 ? (
+          <div className="text-center py-20">
+            <Bell className="w-12 h-12 text-zinc-800 mx-auto mb-4 opacity-20" />
+            <p className="text-xs font-bold text-zinc-600 uppercase tracking-widest">{t('Nenhuma notificação', 'Ninguna notificación')}</p>
+          </div>
+        ) : (
+          notifications.map(n => {
+            const isRead = n.readBy.includes(user?.uid || '');
+            return (
+              <motion.div 
+                key={n.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => {
+                  markNotificationAsRead(n.id);
+                  if (n.link) setView(n.link as View);
+                }}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${isRead ? 'bg-zinc-900/30 border-white/5 opacity-60' : 'bg-zinc-900/80 border-incendeia-red/30 shadow-lg shadow-incendeia-red/5'}`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-xl ${isRead ? 'bg-zinc-800 text-zinc-500' : 'bg-incendeia-red/20 text-incendeia-red'}`}>
+                    {n.type === 'event' ? <Calendar className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <h4 className={`text-xs font-bold uppercase ${isRead ? 'text-zinc-400' : 'text-white'}`}>{n.title}</h4>
+                      {!isRead && <div className="w-2 h-2 bg-incendeia-red rounded-full animate-pulse" />}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed mb-2">{n.body}</p>
+                    <div className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">
+                      {n.createdAt?.toDate ? format(n.createdAt.toDate(), 'dd/MM HH:mm') : 'Agora'}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
+
+const AIChatView = ({ t }: { t: (pt: string, es: string) => string }) => {
+  const [messages, setMessages] = useState<AIChatMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const userMsg: AIChatMessage = {
+      role: 'user',
+      content: input,
+      timestamp: Date.now()
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const systemInstruction = "Você é o Mestre Incendeia, um assistente virtual especializado em Capoeira. Você ajuda alunos com dúvidas sobre golpes, história, música e eventos. Você também pode ajudar a encontrar locais de treino usando o Google Maps. Responda de forma sábia, respeitosa e motivadora, como um mestre de capoeira.";
+      const response = await aiChat([...messages, userMsg], systemInstruction);
+      
+      const modelMsg: AIChatMessage = {
+        role: 'model',
+        content: response,
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, modelMsg]);
+    } catch (error) {
+      console.error("AI Chat Error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTTS = async (text: string, index: number) => {
+    try {
+      const url = await textToSpeech(text);
+      if (url) {
+        setMessages(prev => {
+          const newMsgs = [...prev];
+          newMsgs[index] = { ...newMsgs[index], audioUrl: url };
+          return newMsgs;
+        });
+        const audio = new Audio(url);
+        audio.play();
+      }
+    } catch (error) {
+      console.error("TTS Error:", error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-140px)] p-6">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="bg-incendeia-red/20 p-2 rounded-xl">
+          <Sparkles className="w-6 h-6 text-incendeia-red" />
+        </div>
+        <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('MESTRE IA', 'MAESTRO IA')}</h2>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col gap-4 mb-4 pr-2 custom-scrollbar">
+        {messages.length === 0 && (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mb-4 border border-incendeia-red/20">
+              <Sparkles className="w-10 h-10 text-incendeia-red animate-pulse" />
+            </div>
+            <p className="text-zinc-400 text-sm font-bold uppercase tracking-widest mb-2">
+              {t('SALVE, CAMARÁ!', '¡SALVE, CAMARÁ!')}
+            </p>
+            <p className="text-zinc-600 text-[10px] uppercase tracking-tighter max-w-[200px]">
+              {t('Eu sou o Mestre IA. Como posso ajudar na sua jornada hoje?', 'Soy el Maestro IA. ¿Cómo posso ayudar en tu jornada hoy?')}
+            </p>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            key={i} 
+            className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+          >
+            <div className={`max-w-[85%] p-4 rounded-2xl text-sm relative ${m.role === 'user' ? 'bg-incendeia-red text-white rounded-tr-none shadow-lg shadow-incendeia-red/20' : 'bg-zinc-800 text-zinc-300 rounded-tl-none border border-white/5'}`}>
+              <div className="prose prose-invert prose-sm max-w-none">
+                <Markdown>{m.content}</Markdown>
+              </div>
+              
+              {m.role === 'model' && (
+                <div className="mt-3 flex items-center gap-2">
+                  <button 
+                    onClick={() => handleTTS(m.content, i)}
+                    className="p-1.5 bg-zinc-900/50 rounded-lg hover:bg-incendeia-red/20 transition-colors group"
+                  >
+                    <Volume2 className="w-4 h-4 text-zinc-500 group-hover:text-incendeia-red" />
+                  </button>
+                  {m.audioUrl && (
+                    <div className="h-1 w-12 bg-incendeia-red/20 rounded-full overflow-hidden">
+                      <motion.div 
+                        animate={{ x: [-48, 48] }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="h-full w-full bg-incendeia-red"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ))}
+
+        {isLoading && (
+          <div className="flex items-start gap-2">
+            <div className="bg-zinc-800 p-4 rounded-2xl rounded-tl-none border border-white/5">
+              <div className="flex gap-1">
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 0.6 }} className="w-1.5 h-1.5 bg-incendeia-red rounded-full" />
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }} className="w-1.5 h-1.5 bg-incendeia-red rounded-full" />
+                <motion.div animate={{ scale: [1, 1.5, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }} className="w-1.5 h-1.5 bg-incendeia-red rounded-full" />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex gap-2 bg-zinc-900/50 p-2 rounded-2xl border border-white/5 backdrop-blur-md">
+        <input 
+          type="text" 
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          placeholder={t('Pergunte ao Mestre...', 'Pregunta al Maestro...')}
+          className="flex-1 bg-transparent p-3 text-sm text-white outline-none"
+        />
+        <button 
+          onClick={handleSend}
+          disabled={isLoading || !input.trim()}
+          className="bg-incendeia-red p-3 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:grayscale"
+        >
+          <Send className="w-5 h-5 text-white" />
+        </button>
+      </div>
+    </div>
+  );
+};
 const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, showConfirm, showAlert }: { 
   t: (pt: string, es: string) => string; 
   messages: ChatMessage[]; 
@@ -2759,7 +3528,7 @@ const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, show
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   showAlert: (message: string) => void; 
 }) => {
-  const { reactToMessage } = useAuth();
+  const { reactToMessage, uploadFile, uploadProgress } = useAuth();
   const [msgText, setMsgText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showEmojiMenu, setShowEmojiMenu] = useState<string | null>(null);
@@ -2785,9 +3554,7 @@ const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, show
 
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `chats/images/${Date.now()}_${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
+      const url = await uploadFile(file, `chats/images/${user?.uid}`);
       await sendMessage('', url);
     } catch (error) {
       console.error("Error uploading chat image:", error);
@@ -2935,16 +3702,80 @@ const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, show
           <Plus className="w-5 h-5" />
         </button>
       </div>
+      {isUploading && uploadProgress > 0 && (
+        <div className="mt-2 w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${uploadProgress}%` }}
+            className="h-full bg-incendeia-red"
+          />
+        </div>
+      )}
     </div>
   );
 };
 
-const UserManagementView = ({ t, showConfirm, showAlert }: { 
+const AdminPanelView = ({ t, showConfirm, showAlert }: { 
   t: (pt: string, es: string) => string; 
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   showAlert: (message: string) => void; 
 }) => {
-  const { allUsers, updateOtherUserProfile, deleteOtherUserProfile } = useAuth();
+  const { 
+    allUsers, 
+    updateOtherUserProfile, 
+    deleteOtherUserProfile, 
+    appConfig, 
+    updateAppConfig, 
+    isAdmin,
+    uploadFile,
+    uploadProgress,
+    masters, addMaster, updateMaster, deleteMaster,
+    storeItems, addStoreItem, updateStoreItem, deleteStoreItem,
+    events, addEvent, updateEvent, deleteEvent,
+    branches, addBranch, deleteBranch,
+    feeConfigs, addFeeConfig, deleteFeeConfig
+  } = useAuth();
+  
+  const [activeTab, setActiveTab] = useState<'users' | 'content' | 'config' | 'style' | 'ai'>('users');
+  const [contentSubTab, setContentSubTab] = useState<'masters' | 'store' | 'events' | 'branches'>('masters');
+  const [configSubTab, setConfigSubTab] = useState<'general' | 'banners' | 'social'>('general');
+  
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadContext, setUploadContext] = useState<{ type: 'logo' | 'banner' | 'master' | 'store' | 'event', id?: string } | null>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadContext) return;
+    setIsUploading(true);
+    try {
+      const url = await uploadFile(file, uploadContext.type);
+      
+      if (uploadContext.type === 'logo') {
+        await updateAppConfig({ logoUrl: url });
+      } else if (uploadContext.type === 'banner') {
+        const newBanners = [...(appConfig?.banners || []), url];
+        await updateAppConfig({ banners: newBanners });
+      }
+      
+      showAlert(t('Arquivo enviado com sucesso!', '¡Archivo subido com éxito!'));
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      showAlert(t('Erro ao enviar arquivo.', 'Error al subir archivo.'));
+    } finally {
+      setIsUploading(false);
+      setUploadContext(null);
+    }
+  };
+
+  const triggerUpload = (type: 'logo' | 'banner' | 'master' | 'store' | 'event', id?: string) => {
+    setUploadContext({ type, id });
+    fileInputRef.current?.click();
+  };
+
   const handleRoleChange = async (userId: string, newRole: string) => {
     showConfirm(
       t('ALTERAR CARGO', 'CAMBIAR CARGO'),
@@ -2953,46 +3784,549 @@ const UserManagementView = ({ t, showConfirm, showAlert }: {
     );
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    showConfirm(
-      t('EXCLUIR PERFIL', 'ELIMINAR PERFIL'),
-      t('Deseja excluir permanentemente este perfil? (A conta de login permanecerá ativa)', '¿Desea eliminar permanentemente este perfil? (La cuenta de login permanecerá activa)'),
-      () => deleteOtherUserProfile(userId)
-    );
+  const handleUpdateConfig = async (data: Partial<AppConfig>) => {
+    await updateAppConfig(data);
+    showAlert(t('Configurações salvas!', '¡Configuraciones guardadas!'));
   };
+
+  const handleAiAsk = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsAiLoading(true);
+    const { generateAppAdvice } = await import('./services/geminiService');
+    const response = await generateAppAdvice(aiPrompt);
+    setAiResponse(response);
+    setIsAiLoading(false);
+  };
+
+  if (!isAdmin) return <div className="p-20 text-center text-zinc-500 uppercase font-black-ops">{t('ACESSO NEGADO', 'ACCESO DENEGADO')}</div>;
 
   return (
     <div className="p-6 pb-24">
-      <h2 className="text-2xl font-black-ops text-incendeia-red mb-8 uppercase">{t('GERENCIAR USUÁRIOS', 'GESTIONAR USUARIOS')}</h2>
-      <div className="flex flex-col gap-4">
-        {allUsers.map((u: UserProfile) => (
-          <div key={u.uid} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <LazyImage src={u.photoURL || "https://picsum.photos/seed/user/100/100"} alt={u.nickname || u.displayName} className="w-10 h-10 rounded-full" />
-              <div>
-                <p className="text-sm font-bold text-white">{u.nickname || u.displayName}</p>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold">{u.role}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <select 
-                value={u.role}
-                onChange={(e) => handleRoleChange(u.uid, e.target.value)}
-                className="bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white uppercase outline-none focus:border-incendeia-red"
-              >
-                <option value="member">{t('MEMBRO', 'MIEMBRO')}</option>
-                <option value="admin">{t('ADMIN', 'ADMIN')}</option>
-              </select>
-              <button 
-                onClick={() => handleDeleteUser(u.uid)}
-                className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
-              >
-                <Trash className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+      <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*" />
+      
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('PAINEL ADM', 'PANEL ADM')}</h2>
+          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{t('Controle Total do Grupo', 'Control Total del Grupo')}</p>
+        </div>
+        <div className="bg-zinc-900 px-3 py-1 rounded-full border border-white/10">
+          <span className="text-[8px] font-bold text-zinc-400 uppercase">v{appConfig?.version || 1}</span>
+        </div>
+      </div>
+
+      {/* Main Tabs */}
+      <div className="flex gap-2 mb-6 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
+        {[
+          { id: 'users', icon: Users, label: t('MEMBROS', 'MIEMBROS') },
+          { id: 'content', icon: FileText, label: t('CONTEÚDO', 'CONTENIDO') },
+          { id: 'config', icon: Settings, label: t('AJUSTES', 'AJUSTES') },
+          { id: 'style', icon: Palette, label: t('ESTILO', 'ESTILO') },
+          { id: 'ai', icon: Sparkles, label: t('IA', 'IA') }
+        ].map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <tab.icon className="w-3 h-3" />
+            {tab.label}
+          </button>
         ))}
       </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'users' && (
+          <motion.div 
+            key="users" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-black-ops text-white uppercase tracking-widest">{t('GESTÃO DE MEMBROS', 'GESTIÓN DE MIEMBROS')}</h3>
+              <span className="text-[10px] font-bold text-zinc-500">{allUsers.length} {t('USUÁRIOS', 'USUARIOS')}</span>
+            </div>
+            {allUsers.map((u: UserProfile) => (
+              <div key={u.uid} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <LazyImage src={u.photoURL || "https://picsum.photos/seed/user/100/100"} alt={u.nickname} className="w-10 h-10 rounded-full" />
+                    <div>
+                      <p className="text-sm font-bold text-white">{u.nickname || u.displayName || 'Sem Nome'}</p>
+                      <p className="text-[9px] text-zinc-500 uppercase font-bold">{u.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir este usuário?', '¿Eliminar este usuario?'), () => deleteOtherUserProfile(u.uid))}
+                      className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">{t('CARGO', 'CARGO')}</label>
+                    <select 
+                      value={u.role}
+                      onChange={(e) => handleRoleChange(u.uid, e.target.value)}
+                      className="bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white uppercase outline-none focus:border-incendeia-red"
+                    >
+                      <option value="member">{t('MEMBRO', 'MIEMBRO')}</option>
+                      <option value="admin">{t('ADMIN', 'ADMIN')}</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[8px] font-bold text-zinc-600 uppercase tracking-tighter">{t('GRADUAÇÃO', 'GRADUACIÓN')}</label>
+                    <select 
+                      value={u.graduation}
+                      onChange={(e) => updateOtherUserProfile(u.uid, { graduation: e.target.value })}
+                      className="bg-black/50 border border-white/10 rounded-lg p-2 text-[10px] font-bold text-white uppercase outline-none focus:border-incendeia-red"
+                    >
+                      {GRADUATIONS.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+        )}
+
+        {activeTab === 'content' && (
+          <motion.div 
+            key="content" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col gap-6"
+          >
+            {/* Sub Tabs */}
+            <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
+              {[
+                { id: 'masters', icon: Award, label: t('MESTRES', 'MAESTROS') },
+                { id: 'store', icon: ShoppingBag, label: t('LOJA', 'TIENDA') },
+                { id: 'events', icon: Calendar, label: t('AGENDA', 'AGENDA') },
+                { id: 'branches', icon: MapPin, label: t('FILIAIS', 'FILIALES') }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setContentSubTab(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[8px] font-bold uppercase tracking-widest transition-all ${contentSubTab === tab.id ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
+                >
+                  <tab.icon className="w-3 h-3" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {contentSubTab === 'masters' && (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => addMaster({ name: 'Novo Mestre', role: 'Mestre', bio: '', photoURL: 'https://picsum.photos/seed/master/200/200' })}
+                  className="w-full py-3 border-2 border-dashed border-white/10 rounded-2xl text-[9px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> {t('ADICIONAR MESTRE', 'AÑADIR MAESTRO')}
+                </button>
+                {masters.map(m => (
+                  <div key={m.id} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="relative group">
+                        <LazyImage src={m.photoURL} alt={m.name} className="w-12 h-12 rounded-xl object-cover" />
+                        <button 
+                          onClick={() => showAlert('Upload em breve para mestres individuais')}
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl"
+                        >
+                          <Camera className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          defaultValue={m.name}
+                          onBlur={(e) => updateMaster(m.id, { name: e.target.value })}
+                          className="w-full bg-transparent border-none text-sm font-bold text-white p-0 focus:ring-0"
+                        />
+                        <input 
+                          type="text" 
+                          defaultValue={m.role}
+                          onBlur={(e) => updateMaster(m.id, { role: e.target.value })}
+                          className="w-full bg-transparent border-none text-[10px] font-bold text-incendeia-red p-0 focus:ring-0 uppercase"
+                        />
+                      </div>
+                      <button onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir este mestre?', '¿Eliminar este maestro?'), () => deleteMaster(m.id))} className="p-2 text-zinc-600 hover:text-red-500">
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <textarea 
+                      defaultValue={m.bio}
+                      onBlur={(e) => updateMaster(m.id, { bio: e.target.value })}
+                      className="w-full bg-black/30 border border-white/5 rounded-xl p-3 text-[10px] text-zinc-400 outline-none focus:border-incendeia-red min-h-[60px]"
+                      placeholder={t('Biografia...', 'Biografía...')}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {contentSubTab === 'store' && (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => addStoreItem({ name: 'Novo Produto', price: 0, description: '', imageUrl: 'https://picsum.photos/seed/store/200/200', category: 'Uniforme' })}
+                  className="w-full py-3 border-2 border-dashed border-white/10 rounded-2xl text-[9px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> {t('ADICIONAR PRODUTO', 'AÑADIR PRODUCTO')}
+                </button>
+                {storeItems.map(item => (
+                  <div key={item.id} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <LazyImage src={item.imageUrl} alt={item.name} className="w-12 h-12 rounded-xl object-cover" />
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          defaultValue={item.name}
+                          onBlur={(e) => updateStoreItem(item.id, { name: e.target.value })}
+                          className="w-full bg-transparent border-none text-sm font-bold text-white p-0 focus:ring-0"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-zinc-500">R$</span>
+                          <input 
+                            type="number" 
+                            defaultValue={item.price}
+                            onBlur={(e) => updateStoreItem(item.id, { price: Number(e.target.value) })}
+                            className="w-20 bg-transparent border-none text-sm font-bold text-incendeia-red p-0 focus:ring-0"
+                          />
+                        </div>
+                      </div>
+                      <button onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir este produto?', '¿Eliminar este producto?'), () => deleteStoreItem(item.id))} className="p-2 text-zinc-600 hover:text-red-500">
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {contentSubTab === 'branches' && (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => addBranch({ 
+                    name: 'Nova Filial', 
+                    imageUrl: 'https://picsum.photos/seed/branch/400/300', 
+                    mapUrl: '', 
+                    contact: '', 
+                    trainingDays: ['Seg', 'Qua'], 
+                    trainingHours: '19:00', 
+                    location: '' 
+                  })}
+                  className="w-full py-3 border-2 border-dashed border-white/10 rounded-2xl text-[9px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> {t('ADICIONAR FILIAL', 'AÑADIR FILIAL')}
+                </button>
+                {branches.map(b => (
+                  <div key={b.id} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                      <LazyImage src={b.imageUrl} alt={b.name} className="w-12 h-12 rounded-xl object-cover" />
+                      <div className="flex-1">
+                        <input 
+                          type="text" 
+                          defaultValue={b.name}
+                          onBlur={(e) => addBranch({ ...b, name: e.target.value })}
+                          className="w-full bg-transparent border-none text-sm font-bold text-white p-0 focus:ring-0"
+                        />
+                        <p className="text-[8px] text-zinc-500 uppercase font-bold">{b.location || 'Sem localização'}</p>
+                      </div>
+                      <button onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir esta filial?', '¿Eliminar esta filial?'), () => deleteBranch(b.id))} className="p-2 text-zinc-600 hover:text-red-500">
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {contentSubTab === 'events' && (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => addEvent({ title: 'Novo Evento', description: '', date: new Date(), location: '', type: 'training' })}
+                  className="w-full py-3 border-2 border-dashed border-white/10 rounded-2xl text-[9px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> {t('ADICIONAR EVENTO', 'AÑADIR EVENTO')}
+                </button>
+                {events.map(ev => (
+                  <div key={ev.id} className="bg-zinc-900/50 p-4 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <input 
+                        type="text" 
+                        defaultValue={ev.title}
+                        onBlur={(e) => updateEvent(ev.id, { title: e.target.value })}
+                        className="flex-1 bg-transparent border-none text-sm font-bold text-white p-0 focus:ring-0"
+                      />
+                      <button onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir este evento?', '¿Eliminar este evento?'), () => deleteEvent(ev.id))} className="p-2 text-zinc-600 hover:text-red-500">
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input 
+                        type="datetime-local" 
+                        defaultValue={ev.date instanceof Date ? ev.date.toISOString().slice(0, 16) : ev.date?.toDate?.().toISOString().slice(0, 16)}
+                        onChange={(e) => updateEvent(ev.id, { date: new Date(e.target.value) })}
+                        className="bg-black/30 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none"
+                      />
+                      <select 
+                        value={ev.type}
+                        onChange={(e) => updateEvent(ev.id, { type: e.target.value as any })}
+                        className="bg-black/30 border border-white/5 rounded-lg p-2 text-[10px] text-white outline-none uppercase font-bold"
+                      >
+                        <option value="training">{t('TREINO', 'ENTRENO')}</option>
+                        <option value="roda">{t('RODA', 'RODA')}</option>
+                        <option value="workshop">{t('WORKSHOP', 'WORKSHOP')}</option>
+                        <option value="event">{t('EVENTO', 'EVENTO')}</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'config' && (
+          <motion.div 
+            key="config" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col gap-6"
+          >
+            {/* Sub Tabs */}
+            <div className="flex gap-2 p-1 bg-black/30 rounded-xl border border-white/5">
+              {[
+                { id: 'general', icon: Settings, label: t('GERAL', 'GENERAL') },
+                { id: 'banners', icon: ImageIcon, label: t('BANNERS', 'BANNERS') },
+                { id: 'social', icon: Globe, label: t('REDES', 'REDES') }
+              ].map(tab => (
+                <button 
+                  key={tab.id}
+                  onClick={() => setConfigSubTab(tab.id as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[8px] font-bold uppercase tracking-widest transition-all ${configSubTab === tab.id ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
+                >
+                  <tab.icon className="w-3 h-3" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {configSubTab === 'general' && (
+              <div className="flex flex-col gap-6">
+                <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('MURAL DE AVISOS', 'MURAL DE AVISOS')}</label>
+                  <textarea 
+                    defaultValue={appConfig?.mural}
+                    onBlur={(e) => handleUpdateConfig({ mural: e.target.value })}
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white text-sm outline-none focus:border-incendeia-red min-h-[120px] resize-none"
+                    placeholder={t('Escreva um aviso para todos os membros...', 'Escriba un aviso para todos los miembros...')}
+                  />
+                </div>
+
+                <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('FUNÇÕES ATIVAS', 'FUNCIONES ACTIVAS')}</label>
+                  <div className="flex flex-col gap-3">
+                    {[
+                      { id: 'geminiEnabled', label: t('ASSISTENTE IA', 'ASISTENTE IA') },
+                      { id: 'galleryEnabled', label: t('GALERIA', 'GALERIA') },
+                      { id: 'storeEnabled', label: t('LOJA', 'TIENDA') },
+                      { id: 'chatEnabled', label: t('CHAT', 'CHAT') }
+                    ].map(f => (
+                      <div key={f.id} className="flex items-center justify-between p-3 bg-black/20 rounded-xl">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase">{f.label}</span>
+                        <button 
+                          onClick={() => handleUpdateConfig({ 
+                            features: { ...appConfig?.features, [f.id]: !appConfig?.features?.[f.id as keyof typeof appConfig.features] } as any
+                          })}
+                          className={`w-10 h-5 rounded-full relative transition-all ${appConfig?.features?.[f.id as keyof typeof appConfig.features] ? 'bg-incendeia-red' : 'bg-zinc-800'}`}
+                        >
+                          <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${appConfig?.features?.[f.id as keyof typeof appConfig.features] ? 'right-0.5' : 'left-0.5'}`} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {configSubTab === 'banners' && (
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => triggerUpload('banner')}
+                  className="w-full py-8 border-2 border-dashed border-white/10 rounded-3xl text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex flex-col items-center justify-center gap-2"
+                >
+                  <Plus className="w-6 h-6" />
+                  {t('ADICIONAR NOVO BANNER', 'AÑADIR NUEVO BANNER')}
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  {appConfig?.banners?.map((url, idx) => (
+                    <div key={idx} className="relative group aspect-video rounded-2xl overflow-hidden border border-white/5">
+                      <LazyImage src={url} alt={`Banner ${idx}`} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => {
+                            const newBanners = appConfig.banners?.filter((_, i) => i !== idx);
+                            handleUpdateConfig({ banners: newBanners });
+                          }}
+                          className="p-2 bg-red-500 text-white rounded-lg"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {configSubTab === 'social' && (
+              <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5 flex flex-col gap-4">
+                {[
+                  { id: 'instagram', icon: Instagram, label: 'Instagram' },
+                  { id: 'facebook', icon: Facebook, label: 'Facebook' },
+                  { id: 'youtube', icon: Play, label: 'YouTube' },
+                  { id: 'website', icon: Globe, label: 'Website' }
+                ].map(social => (
+                  <div key={social.id} className="flex flex-col gap-1">
+                    <label className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest flex items-center gap-1">
+                      <social.icon className="w-2 h-2" /> {social.label}
+                    </label>
+                    <input 
+                      type="text" 
+                      defaultValue={appConfig?.socialLinks?.[social.id as keyof typeof appConfig.socialLinks]}
+                      onBlur={(e) => handleUpdateConfig({ 
+                        socialLinks: { ...appConfig?.socialLinks, [social.id]: e.target.value } 
+                      })}
+                      placeholder="https://..."
+                      className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-white text-xs outline-none focus:border-incendeia-red"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'style' && (
+          <motion.div 
+            key="style" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col gap-6"
+          >
+            <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('LOGO DO APP', 'LOGO DEL APP')}</label>
+              <div className="flex flex-col items-center gap-4">
+                <div 
+                  onClick={() => triggerUpload('logo')}
+                  className={`w-32 h-32 rounded-2xl border-2 border-dashed ${appConfig?.logoUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                >
+                  {appConfig?.logoUrl ? (
+                    <img src={appConfig.logoUrl || null} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="flex flex-col items-center text-zinc-500">
+                      <Camera className="w-8 h-8 mb-1" />
+                      <span className="text-[8px] font-bold uppercase tracking-tighter">{t('UPLOAD LOGO', 'SUBIR LOGO')}</span>
+                    </div>
+                  )}
+                  {isUploading && uploadContext?.type === 'logo' && (
+                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
+                      <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                      {uploadProgress > 0 && (
+                        <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${uploadProgress}%` }}
+                            className="h-full bg-incendeia-red"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="w-full">
+                  <label className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest mb-2 block">{t('OU INSIRA A URL', 'O INGRESE LA URL')}</label>
+                  <input 
+                    type="text" 
+                    defaultValue={appConfig?.logoUrl}
+                    onBlur={(e) => handleUpdateConfig({ logoUrl: e.target.value })}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white text-xs outline-none focus:border-incendeia-red"
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('COR PRIMÁRIA', 'COLOR PRIMARIO')}</label>
+              <div className="flex items-center gap-4">
+                <input 
+                  type="color" 
+                  defaultValue={appConfig?.primaryColor}
+                  onChange={(e) => handleUpdateConfig({ primaryColor: e.target.value })}
+                  className="w-12 h-12 rounded-lg bg-transparent border-none cursor-pointer"
+                />
+                <span className="text-sm font-mono text-zinc-400 uppercase">{appConfig?.primaryColor}</span>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('FONTE PRINCIPAL', 'FUENTE PRINCIPAL')}</label>
+              <select 
+                defaultValue={appConfig?.fontFamily}
+                onChange={(e) => handleUpdateConfig({ fontFamily: e.target.value })}
+                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm outline-none focus:border-incendeia-red"
+              >
+                <option value="Black Ops One">Black Ops One (Militar)</option>
+                <option value="Inter">Inter (Moderno)</option>
+                <option value="Space Grotesk">Space Grotesk (Tech)</option>
+                <option value="Outfit">Outfit (Clean)</option>
+              </select>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'ai' && (
+          <motion.div 
+            key="ai" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+            className="flex flex-col gap-6"
+          >
+            <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-incendeia-red/20 rounded-2xl flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-incendeia-red" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black-ops text-white uppercase">{t('ASSISTENTE GEMINI', 'ASISTENTE GEMINI')}</h4>
+                  <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{t('IA para gestão do grupo', 'IA para gestión del grupo')}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                <textarea 
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-2xl p-4 text-white text-sm outline-none focus:border-incendeia-red min-h-[100px] resize-none"
+                  placeholder={t('Pergunte algo sobre como melhorar o grupo ou o app...', 'Pregunte algo sobre cómo mejorar el grupo o el app...')}
+                />
+                <button 
+                  onClick={handleAiAsk}
+                  disabled={isAiLoading || !aiPrompt.trim()}
+                  className="w-full py-4 bg-incendeia-red text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-incendeia-red/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  {isAiLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send className="w-3 h-3" /> {t('PERGUNTAR', 'PREGUNTAR')}</>}
+                </button>
+              </div>
+
+              {aiResponse && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                  className="mt-8 p-6 bg-black/50 rounded-2xl border border-incendeia-red/20"
+                >
+                  <p className="text-zinc-300 text-sm leading-relaxed italic">"{aiResponse}"</p>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -3003,28 +4337,50 @@ const Header = ({ setView, now, locale, logout, t }: {
   locale: Locale; 
   logout: () => void; 
   t: (pt: string, es: string) => string; 
-}) => (
-  <div className="bg-premium-black/90 backdrop-blur-md border-b border-incendeia-red/20 p-4 sticky top-0 z-50 flex items-center justify-between">
-    <button onClick={() => setView('home')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><ChevronLeft className="w-6 h-6 text-incendeia-red" /></button>
-    <div className="flex items-center gap-3">
-      <LazyImage 
-        src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" 
-        alt="Logo" 
-        className="w-10 h-10"
-        imgClassName="mix-blend-screen"
-        objectFit="contain"
-      />
-      <div className="flex flex-col">
-        <div className="flex gap-1 font-black-ops text-[10px] leading-none tracking-tighter">
-          <span className="text-flag-br">INCENDEIA</span>
-          <span className="text-flag-es">CAPOEIRA</span>
+}) => {
+  const { appConfig, isAdmin, notifications, user, requestNotificationPermission } = useAuth();
+  const unreadCount = notifications.filter(n => !n.readBy.includes(user?.uid || '')).length;
+
+  return (
+    <div className="bg-premium-black/90 backdrop-blur-md border-b border-incendeia-red/20 p-4 sticky top-0 z-50 flex items-center justify-between">
+      <button onClick={() => setView('home')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><ChevronLeft className="w-6 h-6 text-incendeia-red" /></button>
+      <div className="flex items-center gap-3">
+        <LazyImage 
+          src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
+          alt="Logo" 
+          className="w-10 h-10"
+          imgClassName="mix-blend-screen"
+          objectFit="contain"
+        />
+        <div className="flex flex-col">
+          <div className="text-[7px] font-black-ops text-zinc-500 uppercase mt-0.5">{format(now, "EEEE, dd/MM/yyyy HH:mm", { locale })}</div>
         </div>
-        <div className="text-[7px] font-black-ops text-zinc-500 uppercase mt-0.5">{format(now, "EEEE, dd/MM/yyyy HH:mm", { locale })}</div>
+      </div>
+      <div className="flex gap-1">
+        <button 
+          onClick={() => {
+            requestNotificationPermission();
+            setView('notifications');
+          }} 
+          className="p-2 hover:bg-zinc-800 rounded-lg transition-colors relative"
+        >
+          <Bell className="w-6 h-6 text-incendeia-red" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-white text-incendeia-red text-[8px] font-bold flex items-center justify-center rounded-full border border-incendeia-red">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+        {isAdmin && (
+          <button onClick={() => setView('admin-panel')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+            <Settings className="w-6 h-6 text-incendeia-red" />
+          </button>
+        )}
+        <button onClick={logout} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><LogOut className="w-6 h-6 text-incendeia-red" /></button>
       </div>
     </div>
-    <button onClick={logout} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><LogOut className="w-6 h-6 text-incendeia-red" /></button>
-  </div>
-);
+  );
+};
 
 // --- Main App Component ---
 
@@ -3109,11 +4465,6 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
         transition={{ delay: 1, duration: 1 }}
         className="mt-12 text-center z-10"
       >
-        <h1 className="text-4xl font-black-ops tracking-tighter">
-          <span className="text-flag-br">INCENDEIA</span>
-          <br />
-          <span className="text-flag-es">CAPOEIRA</span>
-        </h1>
         <div className="h-1 w-48 bg-gradient-to-r from-transparent via-incendeia-red to-transparent mt-4 mx-auto" />
       </motion.div>
     </motion.div>
@@ -3146,7 +4497,9 @@ export default function App() {
     feeConfigs, 
     storeItems,
     masters,
-    allUsers 
+    allUsers,
+    appConfig,
+    updateAppConfig
   } = useAuth();
   const [lang, setLang] = useState<Language>('pt');
   const [view, setView] = useState<View>('splash');
@@ -3213,9 +4566,20 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (user && (view === 'login' || view === 'auth')) setView('home');
-    if (!user && view !== 'login' && view !== 'auth') setView('login');
-  }, [user]);
+    if (loading) return;
+    
+    console.log('Navigation check:', { user: user?.uid, view, loading });
+
+    if (user && (view === 'login' || view === 'auth' || view === 'splash')) {
+      console.log('Redirecting to home because user is logged in');
+      setView('home');
+    }
+    
+    if (!user && view !== 'login' && view !== 'auth' && view !== 'splash') {
+      console.log('Redirecting to login because user is not logged in');
+      setView('login');
+    }
+  }, [user, loading, view]);
 
   useEffect(() => {
     if (profile) {
@@ -3266,14 +4630,30 @@ export default function App() {
       return null;
     } catch (error: any) {
       console.error("Auth error:", error);
-      return (error as any).message || "Erro na autenticação";
+      const errorCode = error?.code || "";
+      if (errorCode === 'auth/invalid-credential') {
+        return t('Apelido ou senha incorretos', 'Apodo o contraseña incorrectos');
+      }
+      if (errorCode === 'auth/email-already-in-use') {
+        return t('Este apelido já está em uso', 'Este apodo ya está en uso');
+      }
+      if (errorCode === 'auth/weak-password') {
+        return t('A senha é muito fraca', 'La contraseña es muy débil');
+      }
+      return error.message || t("Erro na autenticação", "Error en la autenticación");
     }
   };
 
   if (loading) return <div className="min-h-screen bg-premium-black flex items-center justify-center"><div className="w-12 h-12 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
-    <div className="min-h-screen bg-premium-black relative">
+    <div 
+      className="min-h-screen bg-premium-black relative"
+      style={{ 
+        '--incendeia-red': appConfig?.primaryColor || '#cc0000',
+        fontFamily: appConfig?.fontFamily || 'Black Ops One'
+      } as any}
+    >
       <AnimatePresence mode="wait">
         {view === 'splash' ? (
           <SplashScreen key="splash" onComplete={() => setView(user ? 'home' : 'login')} />
@@ -3318,15 +4698,19 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {view === 'home' && <HomeView t={t} setView={setView} profile={profile} hasNewMessages={hasNewMessages} />}
-            {view === 'profile' && <ProfileView t={t} setView={setView} profile={profile} logout={logout} showConfirm={showConfirm} />}
-            {view === 'edit-profile' && <EditProfileView t={t} initialData={profile as UserProfile} handleSaveProfile={handleSaveProfile} setView={setView} />}
+            {view === 'home' && <HomeView t={t} setView={setView} profile={profile} hasNewMessages={hasNewMessages} isAdmin={isAdmin} />}
+            {view === 'profile' && <ProfileView t={t} setView={setView} profile={profile} logout={logout} showConfirm={showConfirm} isAdmin={isAdmin} />}
+            {view === 'edit-profile' && <EditProfileView t={t} initialData={profile as UserProfile} handleSaveProfile={handleSaveProfile} setView={setView} showAlert={showAlert} />}
             {view === 'gallery' && <GalleryView t={t} setView={setView} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
             {view === 'masters' && <MastersView t={t} showConfirm={showConfirm} />}
             {view === 'calendar' && <CalendarView t={t} showConfirm={showConfirm} />}
             {view === 'store' && <StoreView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
             {view === 'finance' && <FinanceView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
-            {view === 'users' && <UserManagementView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
+            {view === 'admin-panel' && <AdminPanelView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
+            {view === 'ai-chat' && <AIChatView t={t} />}
+            {view === 'notifications' && <NotificationsView setView={setView} t={t} />}
+            {view === 'graduations' && <GraduationsView t={t} />}
+            {view === 'branches' && <BranchesView t={t} showConfirm={showConfirm} />}
             {view === 'chat' && <ChatView t={t} messages={messages} sendMessage={sendMessage} deleteMessage={deleteMessage} user={user} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
             
             {/* Navigation Bar */}
@@ -3409,7 +4793,7 @@ export default function App() {
                         { id: 'masters', icon: Users, label: t('MESTRES', 'MAESTROS') },
                         { id: 'store', icon: ShoppingBag, label: t('LOJA', 'TIENDA') },
                         { id: 'finance', icon: DollarSign, label: t('FINANCEIRO', 'FINANCIERO') },
-                        isAdmin && { id: 'users', icon: Users, label: t('USUÁRIOS', 'USUARIOS') },
+                        isAdmin && { id: 'admin-panel', icon: Settings, label: t('PAINEL ADM', 'PANEL ADM') },
                       ].filter((item): item is any => !!item).map((item) => (
                         <button 
                           key={item.id}

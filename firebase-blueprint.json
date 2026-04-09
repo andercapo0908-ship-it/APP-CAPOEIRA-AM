@@ -1,5 +1,43 @@
 {
   "entities": {
+    "appConfig": {
+      "title": "App Configuration",
+      "description": "Global configuration for the application layout, style, and features.",
+      "type": "object",
+      "properties": {
+        "logoUrl": { "type": "string", "description": "URL for the app logo" },
+        "primaryColor": { "type": "string", "description": "Primary theme color (hex)" },
+        "fontFamily": { "type": "string", "description": "Main font family" },
+        "activeTabs": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "List of active navigation tabs"
+        },
+        "features": {
+          "type": "object",
+          "description": "Toggleable app features",
+          "properties": {
+            "geminiEnabled": { "type": "boolean" },
+            "galleryEnabled": { "type": "boolean" },
+            "storeEnabled": { "type": "boolean" },
+            "chatEnabled": { "type": "boolean" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" },
+        "version": { "type": "number" }
+      },
+      "required": ["version", "updatedAt"]
+    },
+    "configHistory": {
+      "title": "Configuration History",
+      "description": "Historical versions of the app configuration.",
+      "type": "object",
+      "properties": {
+        "config": { "$ref": "appConfig" },
+        "archivedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "User": {
       "title": "User",
       "description": "User profile information",
@@ -135,9 +173,49 @@
         "description": { "type": "string" }
       },
       "required": ["name", "amount", "frequency"]
+    },
+    "Branch": {
+      "title": "Branch",
+      "description": "Group affiliates and training locations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "mapUrl": { "type": "string" },
+        "contact": { "type": "string" },
+        "trainingDays": { "type": "array", "items": { "type": "string" } },
+        "trainingHours": { "type": "string" },
+        "location": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "imageUrl", "location"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "App notifications for users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string", "enum": ["event", "message", "system"] },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "readBy": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["title", "body", "type", "createdAt"]
     }
   },
   "firestore": {
+    "/config/{configId}": {
+      "schema": "appConfig",
+      "description": "App-wide configuration settings"
+    },
+    "/configHistory/{historyId}": {
+      "schema": "configHistory",
+      "description": "History of app configurations"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
@@ -173,6 +251,14 @@
     "/feeConfigs/{configId}": {
       "schema": "FeeConfig",
       "description": "Fee configurations"
+    },
+    "/branches/{branchId}": {
+      "schema": "Branch",
+      "description": "Group affiliates and training locations"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "App notifications"
     }
   }
 }

@@ -2,7 +2,52 @@ import { Timestamp } from 'firebase/firestore';
 
 export type Language = 'pt' | 'es';
 
-export type View = 'splash' | 'login' | 'auth' | 'home' | 'profile' | 'edit-profile' | 'gallery' | 'masters' | 'calendar' | 'store' | 'finance' | 'chat' | 'users';
+export type View = 'splash' | 'login' | 'auth' | 'home' | 'profile' | 'edit-profile' | 'gallery' | 'masters' | 'calendar' | 'store' | 'finance' | 'chat' | 'users' | 'admin-panel' | 'ai-chat' | 'notifications' | 'graduations' | 'branches';
+
+export interface Graduation {
+  id: string;
+  name: string;
+  colors: string[]; // Array of colors for solo or mixed
+  meaning: string;
+  description: string;
+  level: 'aluno' | 'graduado' | 'instrutor' | 'professor' | 'mestrando' | 'mestre';
+}
+
+export interface Branch {
+  id: string;
+  name: string;
+  imageUrl: string;
+  mapUrl: string;
+  contact: string;
+  trainingDays: string[];
+  trainingHours: string;
+  location: string;
+  createdAt: any;
+}
+
+export interface AppConfig {
+  logoUrl: string;
+  primaryColor: string;
+  fontFamily: string;
+  activeTabs: string[];
+  banners?: string[];
+  mural?: string;
+  socialLinks?: {
+    instagram?: string;
+    facebook?: string;
+    youtube?: string;
+    website?: string;
+  };
+  features: {
+    geminiEnabled: boolean;
+    galleryEnabled: boolean;
+    storeEnabled: boolean;
+    chatEnabled: boolean;
+  };
+  version: number;
+  updatedAt: any;
+  updatedBy: string;
+}
 
 export interface UserProfile {
   uid: string;
@@ -76,6 +121,7 @@ export interface Event {
   date: any;
   location: string;
   type: 'training' | 'workshop' | 'roda' | 'event' | 'other';
+  imageUrl?: string;
   createdAt?: any;
 }
 
@@ -116,4 +162,21 @@ export interface Message {
   imageUrl?: string;
   createdAt: any; // Using any here because Firestore serverTimestamp is complex to type strictly with Timestamp
   reactions?: { [emoji: string]: string[] };
+}
+
+export interface AIChatMessage {
+  role: 'user' | 'model';
+  content: string;
+  timestamp: number;
+  audioUrl?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: 'event' | 'message' | 'system';
+  link?: string;
+  createdAt: any;
+  readBy: string[];
 }
