@@ -23,8 +23,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
-          (request.auth.token.email == "andercapo0908@gmail.com") ||
-          (request.auth.token.email == "andercapo0908@incendeia.app") ||
+          (request.auth.token.email.matches("andercapo0908@.*")) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
         );
@@ -158,6 +157,11 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
       allow delete: if isAdmin();
+    }
+
+    match /nicknames/{nickname} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
     
     match /{path=**} {

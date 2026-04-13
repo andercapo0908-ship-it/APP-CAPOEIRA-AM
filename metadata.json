@@ -1,5 +1,7 @@
 {
-  "name": "INCENDEIA CAPOEIRA ON",
+  "name": "INCENDEIA CAPOEIRA APP ON OFF 2026",
   "description": "Aplicativo oficial do Grupo Incendeia Capoeira com gestão de membros, financeiro, loja e chat em tempo real.",
-  "requestFramePermissions": ["camera"]
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

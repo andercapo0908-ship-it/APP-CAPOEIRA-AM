@@ -9,7 +9,7 @@ import {
   FacebookAuthProvider,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, query, orderBy, limit, deleteDoc, getDocs, startAfter, QueryDocumentSnapshot, updateDoc, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp, collection, addDoc, query, orderBy, limit, deleteDoc, getDocs, startAfter, QueryDocumentSnapshot, updateDoc, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
 import { auth, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { compressImage } from './lib/uploadUtils';
@@ -35,8 +35,8 @@ interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  login: (nickname: string, password: string) => Promise<void>;
-  register: (nickname: string, password: string, photoURL?: string, role?: 'admin' | 'member') => Promise<void>;
+  login: (nicknameOrEmail: string, password: string) => Promise<void>;
+  register: (email: string, nickname: string, password: string, photoURL?: string, role?: 'admin' | 'member') => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithFacebook: () => Promise<void>;
   logout: () => Promise<void>;
@@ -91,6 +91,11 @@ interface AuthContextType {
   updateAppConfig: (data: Partial<AppConfig>) => Promise<void>;
   uploadProgress: number;
   uploadFile: (file: File, path: string) => Promise<string>;
+  developerMode: boolean;
+  setDeveloperMode: (enabled: boolean) => void;
+  logs: { timestamp: number; message: string; type: 'info' | 'error' | 'warn' }[];
+  addLog: (message: string, type?: 'info' | 'error' | 'warn') => void;
+  unreadNotificationsCount: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -116,20 +121,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [developerMode, setDeveloperMode] = useState(() => localStorage.getItem('devMode') === 'true');
+  const [logs, setLogs] = useState<{ timestamp: number; message: string; type: 'info' | 'error' | 'warn' }[]>([]);
+
+  const addLog = (message: string, type: 'info' | 'error' | 'warn' = 'info') => {
+    const newLog = { timestamp: Date.now(), message, type };
+    setLogs(prev => [newLog, ...prev].slice(0, 100));
+    if (type === 'error') console.error(message);
+    else if (type === 'warn') console.warn(message);
+    else console.log(message);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('devMode', developerMode.toString());
+  }, [developerMode]);
+
+  const unreadNotificationsCount = notifications.filter(n => user && !n.readBy?.includes(user.uid)).length;
 
   const uploadFile = async (file: File, path: string) => {
+    addLog(`Iniciando upload: ${file.name} (${file.size} bytes, ${file.type}) para ${path}`);
     let fileToUpload = file;
     if (file.type.startsWith('image/')) {
       try {
+        addLog(`Tentando compressão de imagem...`);
         fileToUpload = await compressImage(file);
-      } catch (e) {
-        console.warn("Compression failed, using original file", e);
+        addLog(`Arquivo após compressão: ${fileToUpload.size} bytes`);
+      } catch (e: any) {
+        addLog(`Falha na compressão: ${e.message}`, 'warn');
       }
     }
 
     // Sanitize filename to avoid issues with special characters
-    const sanitizedName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-    const storageRef = ref(storage, `${path}/${Date.now()}_${sanitizedName}`);
+    const originalName = file.name || 'upload.jpg';
+    const sanitizedName = originalName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+    const storagePath = `${path}/${Date.now()}_${sanitizedName}`;
+    const storageRef = ref(storage, storagePath);
+    
+    addLog(`Referência de storage criada: ${storagePath}`);
+    
     const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
     return new Promise<string>((resolve, reject) => {
@@ -137,18 +166,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
+          if (progress % 20 === 0) addLog(`Progresso do upload: ${progress.toFixed(0)}%`);
         }, 
         (error) => {
-          console.error("Upload error:", error);
+          addLog(`Erro no upload: ${error.message}`, 'error');
           setUploadProgress(0);
           reject(error);
         }, 
         async () => {
           try {
+            addLog(`Upload concluído, obtendo URL...`);
             const url = await getDownloadURL(uploadTask.snapshot.ref);
+            addLog(`URL obtida com sucesso: ${url.substring(0, 30)}...`);
             setUploadProgress(0);
             resolve(url);
-          } catch (e) {
+          } catch (e: any) {
+            addLog(`Erro ao obter URL: ${e.message}`, 'error');
             reject(e);
           }
         }
@@ -382,11 +415,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const isSpecialAdmin = user?.email?.startsWith('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
+    const isSpecialAdmin = user?.email?.toLowerCase().includes('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
     const isAdminUser = profile?.role === 'admin' || isSpecialAdmin;
 
     // Listen to payments
-    const paymentsQuery = isAdminUser 
+    // If we are in a transition state where profile is not yet loaded, 
+    // we default to the non-admin query to avoid permission errors.
+    const paymentsQuery = (isAdminUser && profile)
       ? query(collection(db, 'payments'), orderBy('date', 'desc'))
       : query(collection(db, 'payments'), where('userId', '==', user.uid), orderBy('date', 'desc'));
     
@@ -440,7 +475,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const snapshot = await getDocs(galleryQuery);
       const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
       
-      setGalleryItems(prev => [...prev, ...newItems]);
+      setGalleryItems(prev => {
+        const existingIds = new Set(prev.map(item => item.id));
+        const uniqueNewItems = newItems.filter(item => !existingIds.has(item.id));
+        return [...prev, ...uniqueNewItems];
+      });
       setLastGalleryDoc(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMoreGallery(snapshot.docs.length === GALLERY_PAGE_SIZE);
     } catch (e) {
@@ -448,17 +487,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (nickname: string, password: string) => {
-    const sanitizedNickname = nickname.toLowerCase().trim().replace(/\s+/g, '.');
-    const email = `${sanitizedNickname}@incendeia.app`;
-    await signInWithEmailAndPassword(auth, email, password);
+  const sanitizeNickname = (name: string) => {
+    return name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-z0-9.]/g, '.')    // Replace non-alphanumeric with dots
+      .replace(/\.+/g, '.')           // Remove consecutive dots
+      .replace(/^\.|\.$/g, '');       // Remove leading/trailing dots
   };
 
-  const register = async (nickname: string, password: string, photoURL?: string, role: 'admin' | 'member' = 'member') => {
-    const sanitizedNickname = nickname.toLowerCase().trim().replace(/\s+/g, '.');
-    const email = `${sanitizedNickname}@incendeia.app`;
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const login = async (nicknameOrEmail: string, password: string) => {
+    let emailToUse = nicknameOrEmail.trim();
+    
+    // Se não for um email (não tem @), tenta buscar o email pelo apelido
+    if (!emailToUse.includes('@')) {
+      const sanitizedNickname = sanitizeNickname(emailToUse);
+      if (!sanitizedNickname) throw new Error("auth/invalid-email");
+
+      try {
+        const nicknameDoc = await getDoc(doc(db, 'nicknames', sanitizedNickname));
+        if (nicknameDoc.exists()) {
+          emailToUse = nicknameDoc.data().email;
+        } else {
+          // Fallback para o formato antigo caso o apelido não esteja na coleção
+          emailToUse = `${sanitizedNickname}@incendeia.app`;
+        }
+      } catch (e) {
+        console.error("Erro ao buscar apelido:", e);
+        emailToUse = `${sanitizedNickname}@incendeia.app`;
+      }
+    }
+    
+    try {
+      await signInWithEmailAndPassword(auth, emailToUse, password);
+    } catch (error: any) {
+      // Se o erro for email inválido mas tentamos usar um apelido, pode ser erro de formato
+      if (error.code === 'auth/invalid-email' && !nicknameOrEmail.includes('@')) {
+        throw new Error("auth/invalid-credential");
+      }
+      throw error;
+    }
+  };
+
+  const register = async (email: string, nickname: string, password: string, photoURL?: string, role: 'admin' | 'member' = 'member') => {
+    const sanitizedNickname = sanitizeNickname(nickname);
+    if (!sanitizedNickname) throw new Error("auth/invalid-email");
+    
+    // Se o email não for válido ou estiver vazio, podemos gerar um baseado no apelido
+    let emailToUse = email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailToUse || !emailRegex.test(emailToUse)) {
+      emailToUse = `${sanitizedNickname}@incendeia.app`;
+    }
+
+    const userCredential = await createUserWithEmailAndPassword(auth, emailToUse, password);
     const firebaseUser = userCredential.user;
+
+    // Salvar o mapeamento de apelido para email para futuros logins
+    try {
+      await setDoc(doc(db, 'nicknames', sanitizedNickname), { email: emailToUse });
+    } catch (e) {
+      console.error("Erro ao salvar apelido:", e);
+    }
 
     // Create initial profile
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -466,7 +559,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       uid: firebaseUser.uid,
       displayName: nickname,
       nickname: nickname,
-      email: email,
+      email: emailToUse,
       photoURL: photoURL || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y',
       role: role,
       graduation: 'Iniciante',
@@ -945,7 +1038,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       appConfig,
       updateAppConfig,
       uploadProgress,
-      uploadFile
+      uploadFile,
+      developerMode,
+      setDeveloperMode,
+      logs,
+      addLog,
+      unreadNotificationsCount
     }}>
       {children}
     </AuthContext.Provider>

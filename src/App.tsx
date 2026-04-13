@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from './AuthContext';
 import { 
   UserProfile, 
@@ -86,8 +86,6 @@ import {
 import { format, parseISO, isValid } from 'date-fns';
 import { ptBR, es } from 'date-fns/locale';
 import type { Locale } from 'date-fns';
-import { LazyLoadImage } from 'react-lazy-load-image-component';
-import 'react-lazy-load-image-component/src/effects/blur.css';
 
 // --- Types & Constants ---
 
@@ -103,6 +101,53 @@ const GRADUATIONS = [
 
 // --- Components ---
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "Ocorreu um erro inesperado.";
+      try {
+        const errorObj = JSON.parse(this.state.error.message);
+        if (errorObj.error === "Missing or insufficient permissions.") {
+          errorMessage = "Você não tem permissão para acessar este recurso. Tente recarregar a página.";
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+
+      return (
+        <div className="min-h-screen bg-premium-black flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 bg-incendeia-red rounded-full flex items-center justify-center mb-6 animate-pulse">
+            <X className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-2xl font-black-ops text-white uppercase mb-4">OPS! ALGO DEU ERRADO</h2>
+          <p className="text-zinc-400 mb-8 max-w-md">{errorMessage}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-incendeia-red px-8 py-3 rounded-xl text-white font-black-ops uppercase tracking-widest hover:bg-red-700 transition-all"
+          >
+            RECARREGAR APP
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const safeToDate = (date: any): Date => {
   if (!date) return new Date();
   if (date.toDate && typeof date.toDate === 'function') return date.toDate();
@@ -115,79 +160,56 @@ const safeToDate = (date: any): Date => {
   return new Date();
 };
 
-const LazyImage = ({ src, alt, className, objectFit = 'cover', imgClassName = '', wrapperClassName = '' }: { src: string; alt: string; className?: string; objectFit?: 'cover' | 'contain'; imgClassName?: string; wrapperClassName?: string }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
+const LazyImage = ({ src, alt, className, objectFit = 'cover', imgClassName = '' }: { src: string | null | undefined; alt: string; className?: string; objectFit?: 'cover' | 'contain'; imgClassName?: string }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    setIsLoaded(false);
+    if (imgRef.current?.complete) {
+      setIsLoading(false);
+    }
   }, [src]);
 
-  return (
-    <div className={`relative overflow-hidden ${className} ${wrapperClassName}`}>
-      {!isLoaded && (
-        <div className="absolute inset-0 bg-zinc-800 animate-pulse flex items-center justify-center">
-          <ImageIcon className="w-8 h-8 text-zinc-700" />
-        </div>
-      )}
-      {src && (
-        <LazyLoadImage
-          alt={alt}
-          src={src}
-          effect="blur"
-          threshold={300}
-          onLoad={() => setIsLoaded(true)}
-          className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'} ${imgClassName}`}
-          wrapperClassName="w-full h-full"
-        />
-      )}
-    </div>
-  );
-};
-
-const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, autoPlay = false }: { src: string; className?: string; objectFit?: 'cover' | 'contain'; controls?: boolean; autoPlay?: boolean }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isInView, setIsInView] = useState(false);
-  const videoRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsInView(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' }
+  if (!src || error) {
+    return (
+      <div className={`flex items-center justify-center bg-zinc-800/50 ${className}`}>
+        <ImageIcon className="w-8 h-8 text-zinc-600 opacity-20" />
+      </div>
     );
-
-    if (videoRef.current) {
-      observer.observe(videoRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
+  }
 
   return (
-    <div ref={videoRef} className={`relative overflow-hidden ${className}`}>
-      {!isLoaded && (
-        <div className="absolute inset-0 bg-zinc-800 animate-pulse flex items-center justify-center">
-          <Play className="w-8 h-8 text-zinc-700" />
+    <div className={`relative overflow-hidden ${className}`}>
+      {isLoading && (
+        <div className="absolute inset-0 bg-zinc-800/50 animate-pulse flex items-center justify-center z-10">
+          <div className="w-6 h-6 border-2 border-incendeia-orange/30 border-t-incendeia-orange rounded-full animate-spin" />
         </div>
       )}
-      {isInView && src && (
-        <video 
-          src={src} 
-          onLoadedData={() => setIsLoaded(true)}
-          controls={controls}
-          autoPlay={autoPlay}
-          muted={autoPlay}
-          playsInline
-          className={`w-full h-full transition-opacity duration-500 ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-        />
-      )}
+      <img
+        ref={imgRef}
+        alt={alt}
+        src={src}
+        loading="lazy"
+        onLoad={() => setIsLoading(false)}
+        onError={() => { setIsLoading(false); setError(true); }}
+        className={`w-full h-full ${objectFit === 'cover' ? 'object-cover' : 'object-contain'} ${imgClassName} transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+        referrerPolicy="no-referrer"
+      />
     </div>
   );
 };
+
+const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, autoPlay = false }: { src: string; className?: string; objectFit?: 'cover' | 'contain'; controls?: boolean; autoPlay?: boolean }) => (
+  <video 
+    src={src} 
+    controls={controls}
+    autoPlay={autoPlay}
+    muted={autoPlay}
+    playsInline
+    className={`${className} ${objectFit === 'cover' ? 'object-cover' : 'object-contain'}`}
+  />
+);
 
 const Footer = ({ t }: { t: (pt: string, es: string) => string }) => (
   <div className="mt-8 py-4 flex flex-col items-center gap-1 z-10">
@@ -244,7 +266,16 @@ const Button = ({
 
 const Card = ({ children, onClick, title, icon: Icon }: { children?: React.ReactNode; onClick?: () => void; title: string; icon: React.ElementType }) => (
   <motion.div 
-    whileHover={{ scale: 1.05 }}
+    animate={{ 
+      y: [0, -8, 0],
+    }}
+    transition={{
+      duration: 3 + Math.random() * 2,
+      repeat: Infinity,
+      ease: "easeInOut",
+      delay: Math.random() * 2
+    }}
+    whileHover={{ scale: 1.05, y: -12 }}
     whileTap={{ scale: 0.95 }}
     onClick={onClick}
     className="aspect-square bg-incendeia-red rounded-full flex flex-col items-center justify-center p-4 cursor-pointer border-2 border-transparent hover:border-incendeia-orange/50 shadow-lg shadow-black/50 group"
@@ -307,14 +338,15 @@ const InkButton = ({
   );
 };
 
-const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode }: { 
+const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }: { 
   t: (pt: string, es: string) => string; 
   setAuthRole: (role: 'member' | 'admin') => void; 
   setView: (view: View) => void; 
   setLang: (lang: Language) => void; 
   setAuthMode: (mode: 'login' | 'register') => void; 
+  appConfig: AppConfig | null;
 }) => (
-  <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-premium-black">
+  <div className="h-screen w-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-premium-black fixed inset-0">
     {/* Background with subtle texture/gradient */}
     <div className="absolute inset-0 z-0">
       <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] ink-splash-orange opacity-10 blur-3xl animate-pulse"></div>
@@ -363,18 +395,27 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode }: {
       </div>
 
       <div className="flex flex-col items-center gap-4">
-        <div className="relative">
+        <div className="relative" style={{ perspective: '1000px' }}>
           <motion.div 
-            animate={{ rotate: 360 }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute -inset-6 border-2 border-dashed border-incendeia-red/20 rounded-full"
+            animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+            className="absolute -inset-8 border-2 border-incendeia-orange rounded-full shadow-[0_0_15px_rgba(255,102,0,0.8),inset_0_0_15px_rgba(255,102,0,0.8)] opacity-80"
+            style={{ transformStyle: 'preserve-3d' }}
           />
-          <LazyImage 
-            src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" 
+          <motion.div 
+            animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="absolute -inset-12 border-2 border-incendeia-red rounded-full shadow-[0_0_15px_rgba(204,0,0,0.8),inset_0_0_15px_rgba(204,0,0,0.8)] opacity-80"
+            style={{ transformStyle: 'preserve-3d' }}
+          />
+          <img 
+            src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
             alt="Logo" 
-            className="w-64 h-64"
-            imgClassName="mix-blend-screen drop-shadow-[0_0_30px_rgba(204,0,0,0.6)]"
-            objectFit="contain"
+            className="w-48 h-48 relative z-10 mix-blend-screen drop-shadow-[0_0_30px_rgba(204,0,0,0.6)] object-contain"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://picsum.photos/seed/capoeira-logo/400/400";
+            }}
           />
         </div>
         <div className="flex flex-col items-center gap-0">
@@ -409,14 +450,16 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode }: {
   </div>
 );
 
-const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: { 
+const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, appConfig }: { 
   t: (pt: string, es: string) => string; 
   setView: (view: View) => void; 
   authRole: 'member' | 'admin'; 
   authMode: 'login' | 'register'; 
   setAuthMode: (mode: 'login' | 'register') => void; 
-  handleAuth: (nickname: string, password: string, photoURL?: string) => Promise<string | null>; 
+  handleAuth: (email: string, nickname: string, password: string, photoURL?: string) => Promise<string | null>; 
+  appConfig: AppConfig | null;
 }) => {
+  const [email, setEmail] = useState('');
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -437,7 +480,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
     }
 
     setIsSubmitting(true);
-    const error = await handleAuth(nickname, password);
+    const error = await handleAuth(email, nickname, password);
     if (error) {
       setAuthError(error);
     }
@@ -448,19 +491,33 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
     <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-premium-black">
       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')]"></div>
       
-      <button onClick={() => setView('login')} className="absolute top-6 left-6 p-2 text-incendeia-red z-20">
+      <button onClick={() => setView('login')} className="absolute top-6 left-6 p-2 text-incendeia-orange z-20">
         <ChevronLeft className="w-8 h-8" />
       </button>
 
       <div className="w-full max-w-sm z-10">
         <div className="flex flex-col items-center mb-8 text-center">
-          <LazyImage 
-            src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" 
-            alt="Logo Oficial" 
-            className="w-20 h-20"
-            imgClassName="mix-blend-screen drop-shadow-[0_0_15px_rgba(204,0,0,0.4)]"
-            objectFit="contain"
-          />
+          <div className="relative" style={{ perspective: '500px' }}>
+            <motion.div 
+              animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-4 border-2 border-incendeia-orange rounded-full shadow-[0_0_10px_rgba(255,102,0,0.8),inset_0_0_10px_rgba(255,102,0,0.8)] opacity-80"
+              style={{ transformStyle: 'preserve-3d' }}
+            />
+            <motion.div 
+              animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-6 border-2 border-incendeia-red rounded-full shadow-[0_0_10px_rgba(204,0,0,0.8),inset_0_0_10px_rgba(204,0,0,0.8)] opacity-80"
+              style={{ transformStyle: 'preserve-3d' }}
+            />
+            <LazyImage 
+              src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
+              alt="Logo Oficial" 
+              className="w-20 h-20 relative z-10"
+              imgClassName="mix-blend-screen drop-shadow-[0_0_15px_rgba(204,0,0,0.4)]"
+              objectFit="contain"
+            />
+          </div>
         </div>
 
         <div className="flex gap-2 mb-6 bg-zinc-900/80 p-1 rounded-2xl border border-white/5">
@@ -485,6 +542,19 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth }: {
         </div>
 
         <div className="flex flex-col gap-6 bg-zinc-900/50 p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
+          {authMode === 'register' && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('EMAIL', 'EMAIL')}</label>
+              <input 
+                type="email" 
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className={`bg-black/50 border ${authError && !email.trim() ? 'border-red-500' : 'border-white/10'} rounded-xl p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
+                placeholder={t('Seu email (opcional)...', 'Tu email (opcional)...')}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('APELIDO', 'APODO')}</label>
             <input 
@@ -545,9 +615,17 @@ const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin }: {
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-64 h-64 bg-incendeia-red/20 rounded-full blur-[100px] animate-pulse" />
+      {/* Background Glow 3D */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ perspective: '1000px' }}>
+        <motion.div 
+          animate={{ 
+            rotateX: [0, 20, 0, -20, 0], 
+            rotateY: [0, 30, 0, -30, 0],
+            z: [0, 50, 0, -50, 0]
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          className="w-[150%] h-[150%] bg-gradient-to-br from-incendeia-red/30 via-incendeia-red/10 to-transparent rounded-full blur-[100px]"
+        />
       </div>
 
       <div className="relative w-full max-w-sm aspect-square flex items-center justify-center">
@@ -684,11 +762,32 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
         {/* Profile Info in Header */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
           <div className="relative w-36 h-36 flex items-center justify-center">
+            {/* Intertwined Arcs Effect */}
+            <motion.div 
+              animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
+              transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-4 border-2 rounded-full opacity-80"
+              style={{ 
+                borderColor: graduationColor,
+                boxShadow: `0 0 15px ${graduationColor}, inset 0 0 15px ${graduationColor}`,
+                transformStyle: 'preserve-3d' 
+              }}
+            />
+            <motion.div 
+              animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              className="absolute -inset-6 border-2 rounded-full opacity-60"
+              style={{ 
+                borderColor: graduationColor,
+                boxShadow: `0 0 10px ${graduationColor}, inset 0 0 10px ${graduationColor}`,
+                transformStyle: 'preserve-3d' 
+              }}
+            />
             {/* Fire Circle Effect */}
             <motion.div 
               animate={{ rotate: 360, scale: [1, 1.1, 1] }}
               transition={{ rotate: { duration: 8, repeat: Infinity, ease: "linear" }, scale: { duration: 2, repeat: Infinity } }}
-              className="absolute inset-0 rounded-full blur-xl opacity-80"
+              className="absolute inset-0 rounded-full blur-xl opacity-40"
               style={{ 
                 background: `conic-gradient(from 0deg, transparent, ${graduationColor}, transparent, ${graduationColor}, transparent)`,
                 boxShadow: `0 0 40px ${graduationColor}`
@@ -743,7 +842,7 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="bg-incendeia-red/20 p-2 rounded-xl">
-                <CheckCircle2 className="w-5 h-5 text-incendeia-red" />
+                <CheckCircle2 className="w-5 h-5 text-incendeia-orange" />
               </div>
               <h3 className="text-xs font-bold text-white uppercase tracking-widest">Check-in</h3>
             </div>
@@ -782,7 +881,7 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-zinc-900/80 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex flex-col items-center text-center">
-            <TrendingUp className="w-6 h-6 text-incendeia-red mb-2" />
+            <TrendingUp className="w-6 h-6 text-incendeia-orange mb-2" />
             <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{t('TREINOS NO MÊS', 'ENTRENOS AL MES')}</span>
             <span className="text-xl font-black-ops text-white">{totalDays} {t('DIAS', 'DÍAS')}</span>
           </div>
@@ -797,7 +896,7 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
         <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-incendeia-red" />
+              <Calendar className="w-5 h-5 text-incendeia-orange" />
               <h3 className="text-xs font-bold text-white uppercase tracking-widest">{t('CALENDÁRIO DE TREINOS', 'CALENDARIO DE ENTRENOS')}</h3>
             </div>
             <button 
@@ -843,14 +942,12 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
               <ImageIcon className="w-5 h-5 text-incendeia-orange" />
               <h3 className="text-xs font-bold text-white uppercase tracking-widest">{t('MINHAS FOTOS', 'MIS FOTOS')}</h3>
             </div>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="bg-incendeia-orange/20 p-2 rounded-lg hover:bg-incendeia-orange/30 transition-colors disabled:opacity-50"
+            <label 
+              className={`bg-incendeia-orange/20 p-2 rounded-lg hover:bg-incendeia-orange/30 transition-colors cursor-pointer flex items-center justify-center relative ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
             >
               {isUploading ? <div className="w-4 h-4 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin" /> : <Plus className="w-4 h-4 text-incendeia-orange" />}
-            </button>
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*" />
+              <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.jpg,.jpeg,.png" disabled={isUploading} />
+            </label>
           </div>
           
           <div className="grid grid-cols-3 gap-2">
@@ -921,10 +1018,32 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
   setView: (view: View) => void; 
   showAlert: (message: string) => void;
 }) => {
-  const { uploadProfilePhoto, uploadProgress } = useAuth();
+  const { uploadProfilePhoto, uploadProgress, updateProfile } = useAuth();
   const [editData, setEditData] = useState(initialData);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const autoSaveTimeoutRef = useRef<any>(null);
+
+  const handleAutoSave = async (field: keyof UserProfile, value: any) => {
+    try {
+      await updateProfile({ [field]: value });
+    } catch (error) {
+      console.error("Auto-save error:", error);
+    }
+  };
+
+  const handleChange = (field: keyof UserProfile, value: any) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+    
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      handleAutoSave(field, value);
+    }, 1000);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -934,7 +1053,8 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
     try {
       const url = await uploadProfilePhoto(file);
       setEditData({ ...editData, photoURL: url });
-      showAlert(t('Foto carregada com sucesso! Clique em salvar para confirmar.', '¡Foto cargada con éxito! Haga clic en guardar para confirmar.'));
+      await updateProfile({ photoURL: url });
+      showAlert(t('Foto carregada e salva com sucesso!', '¡Foto cargada y guardada con éxito!'));
     } catch (error) {
       console.error("Error uploading photo:", error);
       showAlert(t('Erro ao carregar foto.', 'Error al cargar la foto.'));
@@ -949,45 +1069,59 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4 items-center mb-4">
           <div className="w-32 h-32 rounded-full border-4 border-incendeia-red p-1 relative overflow-hidden">
-            <img src={editData.photoURL || "https://picsum.photos/seed/capoeira-user/200/200"} className="w-full h-full rounded-full object-cover" referrerPolicy="no-referrer" />
+            <LazyImage src={editData.photoURL || "https://picsum.photos/seed/capoeira-user/200/200"} alt="Profile" className="w-full h-full rounded-full object-cover" />
             {isUploading && (
-              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
-                <div className="w-8 h-8 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                <div className="w-8 h-8 border-4 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
                 {uploadProgress > 0 && (
-                  <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${uploadProgress}%` }}
-                      className="h-full bg-incendeia-red"
+                      className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
                     />
                   </div>
                 )}
+                <span className="text-white text-xs font-bold mt-2">{Math.round(uploadProgress)}%</span>
               </div>
             )}
           </div>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="image/*"
-          />
-          <Button 
-            variant="danger" 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="text-sm px-8 py-3"
-          >
-            <Camera className="w-5 h-5 mr-2" />
-            {t('ALTERAR FOTO', 'CAMBIAR FOTO')}
-          </Button>
+          <div className="flex items-center gap-2 mt-2">
+            <label 
+              className={`flex-1 flex items-center justify-center bg-incendeia-red text-white font-black-ops uppercase tracking-widest rounded-xl hover:bg-red-700 transition-colors cursor-pointer text-sm px-8 py-3 relative ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <Camera className="w-5 h-5 mr-2" />
+              {t('ALTERAR FOTO', 'CAMBIAR FOTO')}
+              <input 
+                type="file" 
+                onChange={handleFileChange} 
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                accept="image/*,.jpg,.jpeg,.png"
+                disabled={isUploading}
+              />
+            </label>
+            <label 
+              className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              title={t('Google Fotos', 'Google Fotos')}
+            >
+              <img src="https://www.gstatic.com/images/branding/product/2x/photos_96dp.png" className="w-5 h-5 object-contain" alt="Google Photos" />
+              <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+            </label>
+            <label 
+              className="bg-white p-3 rounded-xl shadow-lg shadow-white/10 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              title={t('Google Drive', 'Google Drive')}
+            >
+              <img src="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png" className="w-5 h-5 object-contain" alt="Google Drive" />
+              <input type="file" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+            </label>
+          </div>
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('APELIDO', 'APODO')}</label>
           <input 
             type="text" 
             value={editData.nickname}
-            onChange={e => setEditData({...editData, nickname: e.target.value})}
+            onChange={e => handleChange('nickname', e.target.value)}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red" 
           />
         </div>
@@ -995,7 +1129,7 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('GRADUAÇÃO', 'GRADUACIÓN')}</label>
           <select 
             value={editData.graduation}
-            onChange={e => setEditData({...editData, graduation: e.target.value})}
+            onChange={e => handleChange('graduation', e.target.value)}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red"
           >
             {GRADUATIONS.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
@@ -1006,7 +1140,7 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <input 
             type="date" 
             value={editData.birthDate || ''}
-            onChange={e => setEditData({...editData, birthDate: e.target.value})}
+            onChange={e => handleChange('birthDate', e.target.value)}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red" 
           />
         </div>
@@ -1015,7 +1149,7 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <input 
             type="number" 
             value={editData.age}
-            onChange={e => setEditData({...editData, age: parseInt(e.target.value) || 0})}
+            onChange={e => handleChange('age', parseInt(e.target.value) || 0)}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red" 
           />
         </div>
@@ -1024,7 +1158,7 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <input 
             type="text" 
             value={editData.capoeiraTime}
-            onChange={e => setEditData({...editData, capoeiraTime: e.target.value})}
+            onChange={e => handleChange('capoeiraTime', e.target.value)}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red" 
           />
         </div>
@@ -1032,7 +1166,7 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('DESCRIÇÃO', 'DESCRIPCIÓN')}</label>
           <textarea 
             value={editData.bio}
-            onChange={e => setEditData({...editData, bio: e.target.value})}
+            onChange={e => handleChange('bio', e.target.value)}
             placeholder={t('Conte um pouco sobre você...', 'Cuéntanos un poco sobre ti...')}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red min-h-[100px] resize-none" 
           />
@@ -1041,14 +1175,13 @@ const EditProfileView = ({ t, initialData, handleSaveProfile, setView, showAlert
           <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('FEEDBACK', 'FEEDBACK')}</label>
           <textarea 
             value={editData.feedback}
-            onChange={e => setEditData({...editData, feedback: e.target.value})}
+            onChange={e => handleChange('feedback', e.target.value)}
             placeholder={t('Deixe seu feedback para o mestre...', 'Deja tu feedback para el mestre...')}
             className="bg-zinc-900 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-incendeia-red min-h-[100px] resize-none" 
           />
         </div>
         <div className="flex gap-4 mt-4">
-          <Button variant="danger" className="flex-1" onClick={() => setView('profile')}>{t('CANCELAR', 'CANCELAR')}</Button>
-          <Button onClick={() => handleSaveProfile(editData as UserProfile)} className="flex-1">{t('SALVAR ALTERAÇÕES', 'GUARDAR CAMBIOS')}</Button>
+          <Button variant="danger" className="flex-1" onClick={() => setView('profile')}>{t('VOLTAR', 'VOLVER')}</Button>
         </div>
       </div>
     </div>
@@ -1128,8 +1261,10 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
       setShowUploadModal(false);
       setUploadDescription('');
       setPendingFile(null);
+      showAlert(t('Arquivo enviado com sucesso!', '¡Archivo enviado con éxito!'));
     } catch (error) {
       console.error("Upload failed:", error);
+      showAlert(t('Erro ao enviar arquivo. Verifique sua conexão.', 'Error al enviar archivo. Verifique su conexión.'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1145,41 +1280,68 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
           <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('GALERIA', 'GALERIA')}</h2>
           <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">{t('Fotos e Vídeos do Grupo', 'Fotos y Videos del Grupo')}</p>
         </div>
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="bg-incendeia-red p-3 rounded-2xl shadow-lg shadow-incendeia-red/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
-        >
-          {isUploading ? (
-            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              <Camera className="w-6 h-6 text-white" />
-              <span className="text-[10px] font-bold text-white uppercase tracking-widest pr-1 hidden sm:inline">{t('ENVIAR', 'ENVIAR')}</span>
-            </>
-          )}
-        </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileSelect} 
-          className="hidden" 
-          accept="image/*,video/*"
-        />
+        <div className="flex items-center gap-2">
+          <label 
+            className={`bg-incendeia-red p-3 rounded-2xl shadow-lg shadow-incendeia-red/20 active:scale-95 transition-all cursor-pointer flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+            title={t('Enviar da Galeria', 'Subir de Galería')}
+          >
+            {isUploading ? (
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>
+                <Camera className="w-6 h-6 text-white" />
+                <span className="text-[10px] font-bold text-white uppercase tracking-widest pr-1 hidden sm:inline">{t('ENVIAR', 'ENVIAR')}</span>
+              </>
+            )}
+            <input 
+              type="file" 
+              onChange={handleFileSelect} 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+              accept="image/*,video/*,.jpg,.jpeg,.png,.mp4,.mov"
+              disabled={isUploading}
+            />
+          </label>
+
+          <label 
+            className="bg-blue-600 p-3 rounded-2xl shadow-lg shadow-blue-600/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+            title={t('Google Fotos', 'Google Fotos')}
+          >
+            <img src="https://www.gstatic.com/images/branding/product/2x/photos_96dp.png" className="w-6 h-6 object-contain" alt="Google Photos" />
+            <input 
+              type="file" 
+              onChange={handleFileSelect} 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+              accept="image/*,video/*"
+            />
+          </label>
+
+          <label 
+            className="bg-white p-3 rounded-2xl shadow-lg shadow-white/10 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+            title={t('Google Drive', 'Google Drive')}
+          >
+            <img src="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png" className="w-6 h-6 object-contain" alt="Google Drive" />
+            <input 
+              type="file" 
+              onChange={handleFileSelect} 
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+              accept="image/*,video/*"
+            />
+          </label>
+        </div>
       </div>
 
       {/* Upload Progress Bar (Global) */}
       {isUploading && uploadProgress > 0 && (
-        <div className="mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-white/5 overflow-hidden">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{t('ENVIANDO MÍDIA...', 'ENVIANDO MEDIA...')}</span>
-            <span className="text-[8px] font-bold text-incendeia-red">{Math.round(uploadProgress)}%</span>
+        <div className="mb-6 bg-zinc-900/50 p-4 rounded-2xl border border-incendeia-orange shadow-[0_0_15px_rgba(255,102,0,0.3)] overflow-hidden relative">
+          <div className="flex justify-between items-center mb-2 relative z-10">
+            <span className="text-[10px] font-bold text-white uppercase tracking-widest">{t('ENVIANDO MÍDIA...', 'ENVIANDO MEDIA...')}</span>
+            <span className="text-[10px] font-bold text-incendeia-orange">{Math.round(uploadProgress)}%</span>
           </div>
-          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden relative z-10">
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${uploadProgress}%` }}
-              className="h-full bg-incendeia-red"
+              className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
             />
           </div>
         </div>
@@ -1189,13 +1351,13 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
       <div className="flex gap-2 mb-6 bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
         <button 
           onClick={() => setActiveTab('image')}
-          className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'image' ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+          className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'image' ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
           {t('FOTOS', 'FOTOS')}
         </button>
         <button 
           onClick={() => setActiveTab('video')}
-          className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'video' ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+          className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'video' ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
         >
           {t('VÍDEOS', 'VIDEOS')}
         </button>
@@ -1721,12 +1883,11 @@ const MastersView = ({ t, showConfirm }: {
               
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col items-center gap-3 mb-2">
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`w-32 h-32 rounded-full border-2 border-dashed ${newMaster.photoURL ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                  <label 
+                    className={`w-32 h-32 rounded-full border-2 border-dashed ${newMaster.photoURL ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {newMaster.photoURL ? (
-                      <img src={newMaster.photoURL || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <LazyImage src={newMaster.photoURL || undefined} alt={newMaster.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-500">
                         <Camera className="w-8 h-8 mb-1" />
@@ -1734,30 +1895,31 @@ const MastersView = ({ t, showConfirm }: {
                       </div>
                     )}
                     {isUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
-                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
                         {uploadProgress > 0 && (
-                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${uploadProgress}%` }}
-                              className="h-full bg-incendeia-red"
+                              className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
                             />
                           </div>
                         )}
+                        <span className="text-white text-[10px] font-bold mt-1">{Math.round(uploadProgress)}%</span>
                       </div>
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Plus className="w-6 h-6 text-white" />
                     </div>
-                  </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
+                    <input 
+                      type="file" 
+                      onChange={handleFileChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      accept="image/*,.jpg,.jpeg,.png"
+                      disabled={isUploading}
+                    />
+                  </label>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('NOME', 'NOMBRE')}</label>
@@ -1855,10 +2017,10 @@ const MastersView = ({ t, showConfirm }: {
               <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto mb-8" />
               
               <div className="flex flex-col items-center text-center mb-8">
-                <img 
+                <LazyImage 
                   src={selectedMaster.photoURL || 'https://picsum.photos/seed/mestre/200/200'} 
+                  alt={selectedMaster.name}
                   className="w-32 h-32 rounded-full object-cover border-4 border-incendeia-red mb-4 shadow-2xl shadow-incendeia-red/20" 
-                  referrerPolicy="no-referrer" 
                 />
                 <h3 className="text-3xl font-black-ops text-white uppercase">{selectedMaster.name}</h3>
                 <p className="text-incendeia-red font-bold uppercase tracking-[0.2em] text-xs mt-1">{selectedMaster.role}</p>
@@ -1964,7 +2126,7 @@ const CalendarView = ({ t, showConfirm }: {
     switch (type) {
       case 'training': return <Award className="w-5 h-5 text-blue-400" />;
       case 'workshop': return <Users className="w-5 h-5 text-purple-400" />;
-      case 'roda': return <Play className="w-5 h-5 text-incendeia-red" />;
+      case 'roda': return <Play className="w-5 h-5 text-incendeia-orange" />;
       default: return <Calendar className="w-5 h-5 text-zinc-400" />;
     }
   };
@@ -2062,12 +2224,11 @@ const CalendarView = ({ t, showConfirm }: {
               <h3 className="text-xl font-black-ops text-white mb-6 uppercase tracking-widest">{t('NOVO EVENTO', 'NUEVO EVENTO')}</h3>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col items-center gap-3 mb-2">
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`w-full h-40 rounded-2xl border-2 border-dashed ${newEvent.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                  <label 
+                    className={`w-full h-40 rounded-2xl border-2 border-dashed ${newEvent.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {newEvent.imageUrl ? (
-                      <img src={newEvent.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <LazyImage src={newEvent.imageUrl || undefined} alt={newEvent.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-500">
                         <Camera className="w-8 h-8 mb-1" />
@@ -2075,27 +2236,28 @@ const CalendarView = ({ t, showConfirm }: {
                       </div>
                     )}
                     {isUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
-                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
                         {uploadProgress > 0 && (
-                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${uploadProgress}%` }}
-                              className="h-full bg-incendeia-red"
+                              className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
                             />
                           </div>
                         )}
+                        <span className="text-white text-[10px] font-bold mt-1">{Math.round(uploadProgress)}%</span>
                       </div>
                     )}
-                  </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
+                    <input 
+                      type="file" 
+                      onChange={handleFileChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      accept="image/*,.jpg,.jpeg,.png"
+                      disabled={isUploading}
+                    />
+                  </label>
                 </div>
                 <input 
                   type="text" 
@@ -2275,12 +2437,11 @@ const StoreView = ({ t, showConfirm, showAlert }: {
               
               <div className="flex flex-col gap-5">
                 <div className="flex flex-col items-center gap-3 mb-2">
-                  <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`w-32 h-32 rounded-2xl border-2 border-dashed ${newItem.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
+                  <label 
+                    className={`w-32 h-32 rounded-2xl border-2 border-dashed ${newItem.imageUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {newItem.imageUrl ? (
-                      <img src={newItem.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <LazyImage src={newItem.imageUrl || undefined} alt={newItem.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center text-zinc-500">
                         <Camera className="w-8 h-8 mb-1" />
@@ -2288,30 +2449,31 @@ const StoreView = ({ t, showConfirm, showAlert }: {
                       </div>
                     )}
                     {isUploading && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
-                        <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
                         {uploadProgress > 0 && (
-                          <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${uploadProgress}%` }}
-                              className="h-full bg-incendeia-red"
+                              className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
                             />
                           </div>
                         )}
+                        <span className="text-white text-[10px] font-bold mt-1">{Math.round(uploadProgress)}%</span>
                       </div>
                     )}
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <Plus className="w-6 h-6 text-white" />
                     </div>
-                  </div>
-                  <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    className="hidden" 
-                    accept="image/*"
-                  />
+                    <input 
+                      type="file" 
+                      onChange={handleFileChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      accept="image/*,.jpg,.jpeg,.png"
+                      disabled={isUploading}
+                    />
+                  </label>
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('NOME DO PRODUTO', 'NOMBRE DEL PRODUCTO')}</label>
@@ -2398,11 +2560,10 @@ const StoreView = ({ t, showConfirm, showAlert }: {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="aspect-square w-full relative">
-                  <img 
+                  <LazyImage 
                     src={selectedItem.imageUrl || null} 
                     alt={selectedItem.name} 
                     className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent" />
                 </div>
@@ -2610,19 +2771,19 @@ const FinanceView = ({ t, showConfirm, showAlert }: { t: (pt: string, es: string
         <div className="flex gap-2 mb-6 bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto">
           <button 
             onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
             {t('DASHBOARD', 'DASHBOARD')}
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
             {t('PAGAMENTOS', 'PAGOS')}
           </button>
           <button 
             onClick={() => setActiveTab('admin')}
-            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'admin' ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex-1 min-w-[100px] py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === 'admin' ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
             {t('CONFIGURAÇÕES', 'CONFIGURACIONES')}
           </button>
@@ -2707,7 +2868,7 @@ const FinanceView = ({ t, showConfirm, showAlert }: { t: (pt: string, es: string
                 {upcomingDues.map(due => (
                   <div key={due.id} className="bg-incendeia-red/10 border border-incendeia-red/30 p-4 rounded-2xl flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-incendeia-red" />
+                      <Calendar className="w-5 h-5 text-incendeia-orange" />
                       <div>
                         <p className="text-xs font-bold uppercase text-white">{due.name}</p>
                         <p className="text-[8px] text-zinc-500 uppercase font-bold">{t('Vence este mês', 'Vence este mes')}</p>
@@ -3012,7 +3173,7 @@ const GraduationsView = ({ t }: { t: (pt: string, es: string) => string }) => {
     <div className="p-6 pb-24">
       <div className="flex items-center gap-3 mb-8">
         <div className="bg-incendeia-red/20 p-2 rounded-xl">
-          <Award className="w-6 h-6 text-incendeia-red" />
+          <Award className="w-6 h-6 text-incendeia-orange" />
         </div>
         <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('GRADUAÇÕES', 'GRADUACIONES')}</h2>
       </div>
@@ -3062,7 +3223,7 @@ const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => strin
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="bg-incendeia-red/20 p-2 rounded-xl">
-            <MapPin className="w-6 h-6 text-incendeia-red" />
+            <MapPin className="w-6 h-6 text-incendeia-orange" />
           </div>
           <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('FILIAIS', 'FILIALES')}</h2>
         </div>
@@ -3224,18 +3385,27 @@ const BranchForm = ({ onClose, t }: { onClose: () => void; t: (pt: string, es: s
         <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('IMAGEM', 'IMAGEN')}</label>
         <div className="relative group aspect-video bg-black/50 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center">
           {formData.imageUrl ? (
-            <img src={formData.imageUrl || undefined} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <LazyImage src={formData.imageUrl || undefined} alt={formData.name} className="w-full h-full object-cover" />
           ) : (
             <Camera className="w-8 h-8 text-zinc-700" />
           )}
           <input 
-            type="file" accept="image/*" onChange={handleFileChange}
+            type="file" accept="image/*,.jpg,.jpeg,.png" onChange={handleFileChange}
             className="absolute inset-0 opacity-0 cursor-pointer"
           />
           {isUploading && (
-            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
-              <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
-              <span className="text-[10px] text-white font-bold">{Math.round(uploadProgress)}%</span>
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+              <div className="w-6 h-6 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
+              {uploadProgress > 0 && (
+                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${uploadProgress}%` }}
+                    className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
+                  />
+                </div>
+              )}
+              <span className="text-white text-[10px] font-bold mt-1">{Math.round(uploadProgress)}%</span>
             </div>
           )}
         </div>
@@ -3430,7 +3600,7 @@ const AIChatView = ({ t }: { t: (pt: string, es: string) => string }) => {
     <div className="flex flex-col h-[calc(100vh-140px)] p-6">
       <div className="flex items-center gap-3 mb-8">
         <div className="bg-incendeia-red/20 p-2 rounded-xl">
-          <Sparkles className="w-6 h-6 text-incendeia-red" />
+          <Sparkles className="w-6 h-6 text-incendeia-orange" />
         </div>
         <h2 className="text-2xl font-black-ops text-incendeia-red uppercase">{t('MESTRE IA', 'MAESTRO IA')}</h2>
       </div>
@@ -3676,20 +3846,18 @@ const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, show
         ))}
       </div>
       <div className="flex gap-2">
-        <input 
-          type="file"
-          ref={fileInputRef}
-          onChange={handleImageUpload}
-          className="hidden"
-          accept="image/*"
-        />
-        <button 
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="bg-zinc-800 p-3 rounded-xl active:scale-95 transition-transform border border-white/5 text-zinc-400 hover:text-white disabled:opacity-50"
+        <label 
+          className={`bg-zinc-800 p-3 rounded-xl active:scale-95 transition-transform border border-white/5 text-zinc-400 hover:text-white cursor-pointer flex items-center justify-center relative ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
         >
           {isUploading ? <div className="w-5 h-5 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin" /> : <Camera className="w-5 h-5" />}
-        </button>
+          <input 
+            type="file"
+            onChange={handleImageUpload}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            accept="image/*,.jpg,.jpeg,.png"
+            disabled={isUploading}
+          />
+        </label>
         <input 
           type="text" 
           value={msgText}
@@ -3733,11 +3901,18 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
     storeItems, addStoreItem, updateStoreItem, deleteStoreItem,
     events, addEvent, updateEvent, deleteEvent,
     branches, addBranch, deleteBranch,
-    feeConfigs, addFeeConfig, deleteFeeConfig
+    feeConfigs, addFeeConfig, deleteFeeConfig,
+    developerMode,
+    setDeveloperMode,
+    logs,
+    addLog,
+    galleryItems,
+    deleteGalleryItem,
+    uploadToGallery
   } = useAuth();
   
   const [activeTab, setActiveTab] = useState<'users' | 'content' | 'config' | 'style' | 'ai'>('users');
-  const [contentSubTab, setContentSubTab] = useState<'masters' | 'store' | 'events' | 'branches'>('masters');
+  const [contentSubTab, setContentSubTab] = useState<'masters' | 'store' | 'events' | 'branches' | 'gallery'>('masters');
   const [configSubTab, setConfigSubTab] = useState<'general' | 'banners' | 'social'>('general');
   
   const [aiPrompt, setAiPrompt] = useState('');
@@ -3745,35 +3920,44 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadContext, setUploadContext] = useState<{ type: 'logo' | 'banner' | 'master' | 'store' | 'event', id?: string } | null>(null);
+  const [uploadContext, setUploadContext] = useState<{ type: 'logo' | 'banner' | 'master' | 'store' | 'event' | 'gallery', id?: string } | null>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
     const file = e.target.files?.[0];
-    if (!file || !uploadContext) return;
+    if (!file) return;
     setIsUploading(true);
+    setUploadContext({ type });
     try {
-      const url = await uploadFile(file, uploadContext.type);
-      
-      if (uploadContext.type === 'logo') {
+      const url = await uploadFile(file, type);
+      if (type === 'logo') {
         await updateAppConfig({ logoUrl: url });
-      } else if (uploadContext.type === 'banner') {
+      } else if (type === 'banner') {
         const newBanners = [...(appConfig?.banners || []), url];
         await updateAppConfig({ banners: newBanners });
       }
-      
       showAlert(t('Arquivo enviado com sucesso!', '¡Archivo subido com éxito!'));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading file:", error);
-      showAlert(t('Erro ao enviar arquivo.', 'Error al subir archivo.'));
+      showAlert(t(`Erro ao enviar: ${error.message || 'Desconhecido'}`, `Error al subir: ${error.message || 'Desconocido'}`));
     } finally {
       setIsUploading(false);
       setUploadContext(null);
     }
   };
 
-  const triggerUpload = (type: 'logo' | 'banner' | 'master' | 'store' | 'event', id?: string) => {
-    setUploadContext({ type, id });
-    fileInputRef.current?.click();
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      await uploadToGallery(file);
+      showAlert(t('Mídia adicionada com sucesso!', '¡Medio añadido con éxito!'));
+    } catch (error: any) {
+      console.error("Error uploading to gallery:", error);
+      showAlert(t(`Erro ao enviar: ${error.message || 'Desconhecido'}`, `Error al subir: ${error.message || 'Desconocido'}`));
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -3802,7 +3986,6 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
 
   return (
     <div className="p-6 pb-24">
-      <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept="image/*" />
       
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -3826,7 +4009,7 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-incendeia-red text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            className={`flex items-center gap-2 px-4 py-3 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500 hover:text-zinc-300'}`}
           >
             <tab.icon className="w-3 h-3" />
             {tab.label}
@@ -3903,18 +4086,73 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
                 { id: 'masters', icon: Award, label: t('MESTRES', 'MAESTROS') },
                 { id: 'store', icon: ShoppingBag, label: t('LOJA', 'TIENDA') },
                 { id: 'events', icon: Calendar, label: t('AGENDA', 'AGENDA') },
-                { id: 'branches', icon: MapPin, label: t('FILIAIS', 'FILIALES') }
+                { id: 'branches', icon: MapPin, label: t('FILIAIS', 'FILIALES') },
+                { id: 'gallery', icon: ImageIcon, label: t('GALERIA', 'GALERIA') }
               ].map(tab => (
                 <button 
                   key={tab.id}
                   onClick={() => setContentSubTab(tab.id as any)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[8px] font-bold uppercase tracking-widest transition-all ${contentSubTab === tab.id ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[8px] font-bold uppercase tracking-widest transition-all ${contentSubTab === tab.id ? 'bg-incendeia-red text-white shadow-[0_0_10px_rgba(204,0,0,0.5)]' : 'text-zinc-500'}`}
                 >
                   <tab.icon className="w-3 h-3" />
                   {tab.label}
                 </button>
               ))}
             </div>
+
+            {contentSubTab === 'gallery' && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label 
+                    className={`w-full py-8 border-2 border-dashed border-white/10 rounded-3xl text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-orange hover:text-incendeia-orange transition-all flex flex-col items-center justify-center gap-2 cursor-pointer relative ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {isUploading && uploadContext?.type === 'gallery' ? (
+                      <div className="flex flex-col items-center gap-2">
+                         <div className="w-8 h-8 border-4 border-incendeia-orange border-t-transparent rounded-full animate-spin" />
+                         <span className="text-incendeia-orange font-bold">{Math.round(uploadProgress)}%</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Plus className="w-6 h-6" />
+                        {t('ADICIONAR MÍDIA', 'AÑADIR MEDIO')}
+                      </>
+                    )}
+                    <input type="file" onChange={handleGalleryUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,video/*,.jpg,.jpeg,.png,.mp4,.mov" disabled={isUploading} />
+                  </label>
+                  <div className="flex gap-2">
+                    <label className="flex-1 bg-blue-600/20 border border-blue-600/30 p-3 rounded-2xl flex items-center justify-center gap-2 cursor-pointer hover:bg-blue-600/30 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/photos_96dp.png" className="w-5 h-5 object-contain" alt="Google Photos" />
+                      <span className="text-[8px] font-bold text-blue-400 uppercase tracking-widest">Google Fotos</span>
+                      <input type="file" onChange={handleGalleryUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,video/*" />
+                    </label>
+                    <label className="flex-1 bg-white/5 border border-white/10 p-3 rounded-2xl flex items-center justify-center gap-2 cursor-pointer hover:bg-white/10 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png" className="w-5 h-5 object-contain" alt="Google Drive" />
+                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Google Drive</span>
+                      <input type="file" onChange={handleGalleryUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,video/*" />
+                    </label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {galleryItems.map(item => (
+                    <div key={item.id} className="relative group aspect-square rounded-2xl overflow-hidden border border-white/5">
+                      {item.type === 'video' ? (
+                        <LazyVideo src={item.url} className="w-full h-full" />
+                      ) : (
+                        <LazyImage src={item.url} alt="Gallery item" className="w-full h-full object-cover" />
+                      )}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => showConfirm(t('EXCLUIR', 'ELIMINAR'), t('Excluir esta mídia?', '¿Eliminar este medio?'), () => deleteGalleryItem(item.id, item.authorUid))}
+                          className="p-2 bg-red-500 text-white rounded-lg"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {contentSubTab === 'masters' && (
               <div className="flex flex-col gap-4">
@@ -4145,18 +4383,78 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
                     ))}
                   </div>
                 </div>
+
+                <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('MODO DESENVOLVEDOR', 'MODO DESARROLLADOR')}</label>
+                  <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase">{t('ATIVAR LOGS', 'ACTIVAR LOGS')}</span>
+                      <span className="text-[7px] text-zinc-600 uppercase">{t('Exibe informações técnicas de depuração', 'Muestra información técnica de depuración')}</span>
+                    </div>
+                    <button 
+                      onClick={() => setDeveloperMode(!developerMode)}
+                      className={`w-10 h-5 rounded-full relative transition-all ${developerMode ? 'bg-incendeia-red' : 'bg-zinc-800'}`}
+                    >
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${developerMode ? 'right-0.5' : 'left-0.5'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {developerMode && (
+                  <div className="bg-black p-4 rounded-2xl border border-incendeia-red/20 font-mono text-[8px] max-h-[300px] overflow-y-auto no-scrollbar">
+                    <div className="flex justify-between items-center mb-2 border-b border-white/5 pb-2">
+                      <span className="text-incendeia-red font-bold uppercase tracking-widest">{t('LOGS DO SISTEMA', 'LOGS DEL SISTEMA')}</span>
+                      <button onClick={() => addLog('Logs limpos')} className="text-zinc-600 hover:text-white uppercase">{t('LIMPAR', 'LIMPIAR')}</button>
+                    </div>
+                    {logs.length === 0 ? (
+                      <div className="text-zinc-700 py-4 text-center italic">{t('Nenhum log registrado', 'Ningún log registrado')}</div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        {logs.map((log, i) => (
+                          <div key={i} className={`flex gap-2 ${log.type === 'error' ? 'text-red-500' : log.type === 'warn' ? 'text-yellow-500' : 'text-zinc-400'}`}>
+                            <span className="text-zinc-600">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+                            <span className="flex-1 break-all">{log.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {configSubTab === 'banners' && (
               <div className="flex flex-col gap-4">
-                <button 
-                  onClick={() => triggerUpload('banner')}
-                  className="w-full py-8 border-2 border-dashed border-white/10 rounded-3xl text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-red hover:text-incendeia-red transition-all flex flex-col items-center justify-center gap-2"
-                >
-                  <Plus className="w-6 h-6" />
-                  {t('ADICIONAR NOVO BANNER', 'AÑADIR NUEVO BANNER')}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <label 
+                    className={`w-full py-8 border-2 border-dashed border-white/10 rounded-3xl text-[10px] font-bold text-zinc-500 uppercase tracking-widest hover:border-incendeia-orange hover:text-incendeia-orange transition-all flex flex-col items-center justify-center gap-2 cursor-pointer relative ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {isUploading && uploadContext?.type === 'banner' ? (
+                      <div className="flex flex-col items-center gap-2">
+                         <div className="w-8 h-8 border-4 border-incendeia-orange border-t-transparent rounded-full animate-spin" />
+                         <span className="text-incendeia-orange font-bold">{Math.round(uploadProgress)}%</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Plus className="w-6 h-6" />
+                        {t('ADICIONAR NOVO BANNER', 'AÑADIR NUEVO BANNER')}
+                      </>
+                    )}
+                    <input type="file" onChange={(e) => handleDirectUpload(e, 'banner')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.jpg,.jpeg,.png" disabled={isUploading} />
+                  </label>
+                  <div className="flex gap-2">
+                    <label className="flex-1 bg-blue-600/20 border border-blue-600/30 p-3 rounded-2xl flex items-center justify-center gap-2 cursor-pointer hover:bg-blue-600/30 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/photos_96dp.png" className="w-5 h-5 object-contain" alt="Google Photos" />
+                      <span className="text-[8px] font-bold text-blue-400 uppercase tracking-widest">Google Fotos</span>
+                      <input type="file" onChange={(e) => handleDirectUpload(e, 'banner')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+                    </label>
+                    <label className="flex-1 bg-white/5 border border-white/10 p-3 rounded-2xl flex items-center justify-center gap-2 cursor-pointer hover:bg-white/10 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png" className="w-5 h-5 object-contain" alt="Google Drive" />
+                      <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">Google Drive</span>
+                      <input type="file" onChange={(e) => handleDirectUpload(e, 'banner')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+                    </label>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {appConfig?.banners?.map((url, idx) => (
                     <div key={idx} className="relative group aspect-video rounded-2xl overflow-hidden border border-white/5">
@@ -4214,32 +4512,45 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
             <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 block">{t('LOGO DO APP', 'LOGO DEL APP')}</label>
               <div className="flex flex-col items-center gap-4">
-                <div 
-                  onClick={() => triggerUpload('logo')}
-                  className={`w-32 h-32 rounded-2xl border-2 border-dashed ${appConfig?.logoUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30`}
-                >
-                  {appConfig?.logoUrl ? (
-                    <img src={appConfig.logoUrl || null} className="w-full h-full object-contain p-2" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="flex flex-col items-center text-zinc-500">
-                      <Camera className="w-8 h-8 mb-1" />
-                      <span className="text-[8px] font-bold uppercase tracking-tighter">{t('UPLOAD LOGO', 'SUBIR LOGO')}</span>
-                    </div>
-                  )}
-                  {isUploading && uploadContext?.type === 'logo' && (
-                    <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4">
-                      <div className="w-6 h-6 border-2 border-incendeia-red border-t-transparent rounded-full animate-spin mb-2" />
-                      {uploadProgress > 0 && (
-                        <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${uploadProgress}%` }}
-                            className="h-full bg-incendeia-red"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                <div className="flex flex-col gap-2">
+                  <label 
+                    className={`w-32 h-32 rounded-2xl border-2 border-dashed ${appConfig?.logoUrl ? 'border-incendeia-red' : 'border-white/20'} flex items-center justify-center overflow-hidden cursor-pointer relative group bg-black/30 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {appConfig?.logoUrl ? (
+                      <LazyImage src={appConfig.logoUrl} alt="Logo" className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <div className="flex flex-col items-center text-zinc-500">
+                        <Camera className="w-8 h-8 mb-1" />
+                        <span className="text-[8px] font-bold uppercase tracking-tighter">{t('UPLOAD LOGO', 'SUBIR LOGO')}</span>
+                      </div>
+                    )}
+                    {isUploading && uploadContext?.type === 'logo' && (
+                      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin mb-2" />
+                        {uploadProgress > 0 && (
+                          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mt-2">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${uploadProgress}%` }}
+                              className="h-full bg-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.8)]"
+                            />
+                          </div>
+                        )}
+                        <span className="text-white text-[10px] font-bold mt-1">{Math.round(uploadProgress)}%</span>
+                      </div>
+                    )}
+                    <input type="file" onChange={(e) => handleDirectUpload(e, 'logo')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*,.jpg,.jpeg,.png" disabled={isUploading} />
+                  </label>
+                  <div className="flex gap-2">
+                    <label className="bg-blue-600/20 border border-blue-600/30 p-2 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-blue-600/30 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/photos_96dp.png" className="w-4 h-4 object-contain" alt="Google Photos" />
+                      <input type="file" onChange={(e) => handleDirectUpload(e, 'logo')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+                    </label>
+                    <label className="bg-white/5 border border-white/10 p-2 rounded-xl flex items-center justify-center gap-2 cursor-pointer hover:bg-white/10 transition-all">
+                      <img src="https://www.gstatic.com/images/branding/product/2x/drive_2020q4_48dp.png" className="w-4 h-4 object-contain" alt="Google Drive" />
+                      <input type="file" onChange={(e) => handleDirectUpload(e, 'logo')} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*" />
+                    </label>
+                  </div>
                 </div>
                 <div className="w-full">
                   <label className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest mb-2 block">{t('OU INSIRA A URL', 'O INGRESE LA URL')}</label>
@@ -4291,7 +4602,7 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
             <div className="bg-zinc-900/50 p-6 rounded-3xl border border-white/5">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-incendeia-red/20 rounded-2xl flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-incendeia-red" />
+                  <Sparkles className="w-6 h-6 text-incendeia-orange" />
                 </div>
                 <div>
                   <h4 className="text-sm font-black-ops text-white uppercase">{t('ASSISTENTE GEMINI', 'ASISTENTE GEMINI')}</h4>
@@ -4343,7 +4654,7 @@ const Header = ({ setView, now, locale, logout, t }: {
 
   return (
     <div className="bg-premium-black/90 backdrop-blur-md border-b border-incendeia-red/20 p-4 sticky top-0 z-50 flex items-center justify-between">
-      <button onClick={() => setView('home')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><ChevronLeft className="w-6 h-6 text-incendeia-red" /></button>
+      <button onClick={() => setView('home')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><ChevronLeft className="w-6 h-6 text-incendeia-orange" /></button>
       <div className="flex items-center gap-3">
         <LazyImage 
           src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
@@ -4364,7 +4675,7 @@ const Header = ({ setView, now, locale, logout, t }: {
           }} 
           className="p-2 hover:bg-zinc-800 rounded-lg transition-colors relative"
         >
-          <Bell className="w-6 h-6 text-incendeia-red" />
+          <Bell className="w-6 h-6 text-incendeia-orange" />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 w-4 h-4 bg-white text-incendeia-red text-[8px] font-bold flex items-center justify-center rounded-full border border-incendeia-red">
               {unreadCount}
@@ -4373,10 +4684,10 @@ const Header = ({ setView, now, locale, logout, t }: {
         </button>
         {isAdmin && (
           <button onClick={() => setView('admin-panel')} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
-            <Settings className="w-6 h-6 text-incendeia-red" />
+            <Settings className="w-6 h-6 text-incendeia-orange" />
           </button>
         )}
-        <button onClick={logout} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><LogOut className="w-6 h-6 text-incendeia-red" /></button>
+        <button onClick={logout} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"><LogOut className="w-6 h-6 text-incendeia-orange" /></button>
       </div>
     </div>
   );
@@ -4405,7 +4716,7 @@ const SmokeEffect = () => {
   );
 };
 
-const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
+const SplashScreen = ({ onComplete, logoUrl }: { onComplete: () => void; logoUrl?: string | null }) => {
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -4451,10 +4762,13 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
           <div className="absolute -inset-12 rounded-full border-2 border-incendeia-orange/20 animate-fire [animation-delay:-2s]" />
           
           <img 
-            src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" 
+            src={logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
             alt="Logo" 
             className="w-48 h-48 object-contain mix-blend-screen drop-shadow-[0_0_30px_rgba(204,0,0,0.8)]" 
             referrerPolicy="no-referrer" 
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://picsum.photos/seed/capoeira-logo/400/400";
+            }}
           />
         </motion.div>
       </div>
@@ -4472,6 +4786,14 @@ const SplashScreen = ({ onComplete }: { onComplete: () => void }) => {
 };
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
+  );
+}
+
+function AppContent() {
   const { 
     user, 
     profile, 
@@ -4499,10 +4821,15 @@ export default function App() {
     masters,
     allUsers,
     appConfig,
-    updateAppConfig
+    updateAppConfig,
+    developerMode,
+    setDeveloperMode,
+    logs,
+    addLog,
+    unreadNotificationsCount
   } = useAuth();
   const [lang, setLang] = useState<Language>('pt');
-  const [view, setView] = useState<View>('splash');
+  const [view, setView] = useState<View>('login');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authRole, setAuthRole] = useState<'member' | 'admin'>('member');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -4619,20 +4946,23 @@ export default function App() {
     }
   };
 
-  const handleAuth = async (nickname: string, password: string, photoURL?: string) => {
+  const handleAuth = async (email: string, nickname: string, password: string, photoURL?: string) => {
     try {
       if (authMode === 'login') {
         await loginFn(nickname, password);
       } else {
-        await registerFn(nickname, password, photoURL || '', authRole);
+        await registerFn(email, nickname, password, photoURL || '', authRole);
       }
       setView('home');
       return null;
     } catch (error: any) {
       console.error("Auth error:", error);
       const errorCode = error?.code || "";
-      if (errorCode === 'auth/invalid-credential') {
+      if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
         return t('Apelido ou senha incorretos', 'Apodo o contraseña incorrectos');
+      }
+      if (errorCode === 'auth/invalid-email') {
+        return t('Email ou apelido inválido', 'Email o apodo inválido');
       }
       if (errorCode === 'auth/email-already-in-use') {
         return t('Este apelido já está em uso', 'Este apodo ya está en uso');
@@ -4656,10 +4986,10 @@ export default function App() {
     >
       <AnimatePresence mode="wait">
         {view === 'splash' ? (
-          <SplashScreen key="splash" onComplete={() => setView(user ? 'home' : 'login')} />
+          <SplashScreen key="splash" logoUrl={appConfig?.logoUrl} onComplete={() => setView(user ? 'home' : 'login')} />
         ) : view === 'login' ? (
           <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <LoginView t={t} setAuthRole={setAuthRole} setView={setView} setLang={setLang} setAuthMode={setAuthMode} />
+            <LoginView t={t} setAuthRole={setAuthRole} setView={setView} setLang={setLang} setAuthMode={setAuthMode} appConfig={appConfig} />
           </motion.div>
         ) : view === 'auth' ? (
           <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -4668,8 +4998,9 @@ export default function App() {
               setView={setView} 
               authRole={authRole} 
               authMode={authMode} 
-              setAuthMode={setAuthMode}
+              setAuthMode={setAuthMode} 
               handleAuth={handleAuth}
+              appConfig={appConfig}
             />
           </motion.div>
         ) : (
@@ -4687,7 +5018,7 @@ export default function App() {
                   className="fixed top-20 left-4 right-4 bg-zinc-900/95 border border-incendeia-red/30 p-4 rounded-2xl z-[100] shadow-2xl backdrop-blur-md flex items-center gap-4 cursor-pointer active:scale-95 transition-transform"
                 >
                   <div className="bg-incendeia-red/20 p-2 rounded-full">
-                    <MessageSquare className="w-5 h-5 text-incendeia-red" />
+                    <MessageSquare className="w-5 h-5 text-incendeia-orange" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[10px] font-bold text-incendeia-red uppercase tracking-widest leading-none mb-1">{showToast.author}</p>
@@ -4698,39 +5029,49 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {view === 'home' && <HomeView t={t} setView={setView} profile={profile} hasNewMessages={hasNewMessages} isAdmin={isAdmin} />}
-            {view === 'profile' && <ProfileView t={t} setView={setView} profile={profile} logout={logout} showConfirm={showConfirm} isAdmin={isAdmin} />}
-            {view === 'edit-profile' && <EditProfileView t={t} initialData={profile as UserProfile} handleSaveProfile={handleSaveProfile} setView={setView} showAlert={showAlert} />}
-            {view === 'gallery' && <GalleryView t={t} setView={setView} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
-            {view === 'masters' && <MastersView t={t} showConfirm={showConfirm} />}
-            {view === 'calendar' && <CalendarView t={t} showConfirm={showConfirm} />}
-            {view === 'store' && <StoreView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
-            {view === 'finance' && <FinanceView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
-            {view === 'admin-panel' && <AdminPanelView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
-            {view === 'ai-chat' && <AIChatView t={t} />}
-            {view === 'notifications' && <NotificationsView setView={setView} t={t} />}
-            {view === 'graduations' && <GraduationsView t={t} />}
-            {view === 'branches' && <BranchesView t={t} showConfirm={showConfirm} />}
-            {view === 'chat' && <ChatView t={t} messages={messages} sendMessage={sendMessage} deleteMessage={deleteMessage} user={user} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={view}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {view === 'home' && <HomeView t={t} setView={setView} profile={profile} hasNewMessages={hasNewMessages} isAdmin={isAdmin} />}
+                {view === 'profile' && <ProfileView t={t} setView={setView} profile={profile} logout={logout} showConfirm={showConfirm} isAdmin={isAdmin} />}
+                {view === 'edit-profile' && <EditProfileView t={t} initialData={profile as UserProfile} handleSaveProfile={handleSaveProfile} setView={setView} showAlert={showAlert} />}
+                {view === 'gallery' && <GalleryView t={t} setView={setView} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
+                {view === 'masters' && <MastersView t={t} showConfirm={showConfirm} />}
+                {view === 'calendar' && <CalendarView t={t} showConfirm={showConfirm} />}
+                {view === 'store' && <StoreView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
+                {view === 'finance' && <FinanceView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
+                {view === 'admin-panel' && <AdminPanelView t={t} showConfirm={showConfirm} showAlert={showAlert} />}
+                {view === 'ai-chat' && <AIChatView t={t} />}
+                {view === 'notifications' && <NotificationsView setView={setView} t={t} />}
+                {view === 'graduations' && <GraduationsView t={t} />}
+                {view === 'branches' && <BranchesView t={t} showConfirm={showConfirm} />}
+                {view === 'chat' && <ChatView t={t} messages={messages} sendMessage={sendMessage} deleteMessage={deleteMessage} user={user} isAdmin={isAdmin} showConfirm={showConfirm} showAlert={showAlert} />}
+              </motion.div>
+            </AnimatePresence>
             
             {/* Navigation Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/90 backdrop-blur-lg border-t border-incendeia-red/20 p-4 flex justify-around items-center z-50">
-              <button onClick={() => setView('home')} className={`p-2 rounded-full transition-all ${view === 'home' ? 'bg-incendeia-red scale-110' : 'text-zinc-500'}`}>
+            <div className="fixed bottom-0 left-0 right-0 bg-zinc-900/90 backdrop-blur-lg border-t border-incendeia-orange/20 p-4 flex justify-around items-center z-50">
+              <button onClick={() => setView('home')} className={`p-2 rounded-full transition-all ${view === 'home' ? 'bg-incendeia-orange text-white scale-110 shadow-[0_0_10px_rgba(255,102,0,0.5)]' : 'text-incendeia-orange hover:text-white'}`}>
                 <Home className="w-6 h-6" />
               </button>
-              <button onClick={() => setView('chat')} className={`p-2 rounded-full transition-all relative ${view === 'chat' ? 'bg-incendeia-red scale-110' : 'text-zinc-500'}`}>
+              <button onClick={() => setView('chat')} className={`p-2 rounded-full transition-all relative ${view === 'chat' ? 'bg-incendeia-orange text-white scale-110 shadow-[0_0_10px_rgba(255,102,0,0.5)]' : 'text-incendeia-orange hover:text-white'}`}>
                 <MessageSquare className="w-6 h-6" />
                 {hasNewMessages && view !== 'chat' && (
-                  <span className="absolute top-1 right-1 w-3 h-3 bg-white border-2 border-incendeia-red rounded-full animate-pulse shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
+                  <span className="absolute top-1 right-1 w-3 h-3 bg-white border-2 border-incendeia-orange rounded-full animate-pulse shadow-[0_0_5px_rgba(255,255,255,0.8)]" />
                 )}
               </button>
-              <button onClick={() => setView('store')} className={`p-2 rounded-full transition-all ${view === 'store' ? 'bg-incendeia-red scale-110' : 'text-zinc-500'}`}>
+              <button onClick={() => setView('store')} className={`p-2 rounded-full transition-all ${view === 'store' ? 'bg-incendeia-orange text-white scale-110 shadow-[0_0_10px_rgba(255,102,0,0.5)]' : 'text-incendeia-orange hover:text-white'}`}>
                 <ShoppingBag className="w-6 h-6" />
               </button>
-              <button onClick={() => setView('profile')} className={`p-2 rounded-full transition-all ${view === 'profile' || view === 'edit-profile' ? 'bg-incendeia-red scale-110' : 'text-zinc-500'}`}>
+              <button onClick={() => setView('profile')} className={`p-2 rounded-full transition-all ${view === 'profile' || view === 'edit-profile' ? 'bg-incendeia-orange text-white scale-110 shadow-[0_0_10px_rgba(255,102,0,0.5)]' : 'text-incendeia-orange hover:text-white'}`}>
                 <User className="w-6 h-6" />
               </button>
-              <button onClick={() => setIsMenuOpen(true)} className="p-2 text-zinc-500">
+              <button onClick={() => setIsMenuOpen(true)} className={`p-2 transition-all ${isMenuOpen ? 'text-white' : 'text-incendeia-orange hover:text-white'}`}>
                 <Menu className="w-6 h-6" />
               </button>
             </div>
@@ -4780,8 +5121,15 @@ export default function App() {
                     className="fixed top-0 left-0 bottom-0 w-64 bg-zinc-900 z-[70] p-6 border-r border-incendeia-red/20"
                   >
                     <div className="flex justify-between items-center mb-8">
-                      <img src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" className="w-12 h-12" referrerPolicy="no-referrer" />
-                      <button onClick={() => setIsMenuOpen(false)}><X className="w-6 h-6 text-incendeia-red" /></button>
+                      <img 
+                        src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
+                        className="w-12 h-12 object-contain" 
+                        referrerPolicy="no-referrer" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "https://picsum.photos/seed/capoeira-logo/400/400";
+                        }}
+                      />
+                      <button onClick={() => setIsMenuOpen(false)}><X className="w-6 h-6 text-incendeia-orange" /></button>
                     </div>
                     <nav className="flex flex-col gap-4">
                       {[
@@ -4798,14 +5146,14 @@ export default function App() {
                         <button 
                           key={item.id}
                           onClick={() => { setView(item.id as View); setIsMenuOpen(false); }}
-                          className="flex items-center justify-between p-3 hover:bg-incendeia-red/10 rounded-xl transition-colors text-zinc-300 hover:text-white font-black-ops text-sm group"
+                          className="flex items-center justify-between p-3 hover:bg-incendeia-orange/10 rounded-xl transition-colors text-zinc-300 hover:text-white font-black-ops text-sm group"
                         >
                           <div className="flex items-center gap-4">
-                            <item.icon className="w-5 h-5 text-incendeia-red" />
+                            <item.icon className="w-5 h-5 text-incendeia-orange" />
                             {item.label}
                           </div>
                           {item.hasNotification && (
-                            <span className="w-2 h-2 bg-incendeia-red rounded-full animate-pulse shadow-[0_0_5px_rgba(255,0,0,0.5)]" />
+                            <span className="w-2 h-2 bg-incendeia-orange rounded-full animate-pulse shadow-[0_0_5px_rgba(255,102,0,0.5)]" />
                           )}
                         </button>
                       ))}
