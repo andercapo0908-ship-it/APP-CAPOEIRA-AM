@@ -22,16 +22,28 @@ export interface Branch {
   trainingDays: string[];
   trainingHours: string;
   location: string;
-  createdAt: any;
+  createdAt?: any;
 }
 
 export interface AppConfig {
+  groupName: string;
   logoUrl: string;
   primaryColor: string;
+  secondaryColor?: string;
   fontFamily: string;
   activeTabs: string[];
   banners?: string[];
   mural?: string;
+  uiStyle?: {
+    borderRadius: string;
+    buttonStyle: 'glass' | 'solid' | 'brutalist' | 'neon';
+    animationsEnabled: boolean;
+    headerStyle?: 'minimal' | 'massive';
+    smokeEnabled?: boolean;
+    fireEnabled?: boolean;
+    vibrationEnabled?: boolean;
+    particlesEnabled?: boolean;
+  };
   socialLinks?: {
     instagram?: string;
     facebook?: string;
@@ -43,10 +55,21 @@ export interface AppConfig {
     galleryEnabled: boolean;
     storeEnabled: boolean;
     chatEnabled: boolean;
+    notificationsEnabled: boolean;
+    eventsEnabled: boolean;
   };
   version: number;
   updatedAt: any;
   updatedBy: string;
+}
+
+export interface EventNotice {
+  id: string;
+  title: string;
+  description: string;
+  importance: 'normal' | 'high' | 'urgent';
+  date: any;
+  createdAt?: any;
 }
 
 export interface UserProfile {
@@ -62,7 +85,7 @@ export interface UserProfile {
   bio: string;
   birthDate: string;
   feedback: string;
-  createdAt: any;
+  createdAt?: any;
 }
 
 export interface TrainingLog {

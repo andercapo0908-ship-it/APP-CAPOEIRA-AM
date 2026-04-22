@@ -28,7 +28,8 @@ import {
   Language,
   AppConfig,
   AppNotification,
-  Branch
+  Branch,
+  EventNotice
 } from './types';
 
 interface AuthContextType {
@@ -47,7 +48,7 @@ interface AuthContextType {
   sendMessage: (text?: string, imageUrl?: string) => Promise<void>;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
-  uploadToGallery: (file: File, description?: string) => Promise<void>;
+  uploadToGallery: (fileOrUrl: File | string, description?: string) => Promise<void>;
   deleteGalleryItem: (id: string, authorUid?: string) => Promise<void>;
   likeGalleryItem: (itemId: string, isLiked: boolean) => Promise<void>;
   reactToGalleryItem: (itemId: string, emoji: string) => Promise<void>;
@@ -85,10 +86,14 @@ interface AuthContextType {
   markNotificationAsRead: (id: string) => Promise<void>;
   requestNotificationPermission: () => Promise<void>;
   addBranch: (data: Omit<Branch, 'id' | 'createdAt'>) => Promise<void>;
+  updateBranch: (id: string, data: Partial<Branch>) => Promise<void>;
   deleteBranch: (id: string) => Promise<void>;
   isAdmin: boolean;
   appConfig: AppConfig | null;
   updateAppConfig: (data: Partial<AppConfig>) => Promise<void>;
+  eventNotices: EventNotice[];
+  addEventNotice: (data: Omit<EventNotice, 'id' | 'createdAt'>) => Promise<void>;
+  deleteEventNotice: (id: string) => Promise<void>;
   uploadProgress: number;
   uploadFile: (file: File, path: string) => Promise<string>;
   developerMode: boolean;
@@ -117,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userGallery, setUserGallery] = useState<GalleryItem[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [eventNotices, setEventNotices] = useState<EventNotice[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -138,26 +144,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const unreadNotificationsCount = notifications.filter(n => user && !n.readBy?.includes(user.uid)).length;
 
-  const uploadFile = async (file: File, path: string) => {
-    addLog(`Iniciando upload: ${file.name} (${file.size} bytes, ${file.type}) para ${path}`);
-    let fileToUpload = file;
-    if (file.type.startsWith('image/')) {
+  const uploadFile = async (fileOrUrl: File | string, path: string) => {
+    const isUrl = typeof fileOrUrl === 'string';
+    addLog(`[NANO BANANA] Iniciando upload: ${isUrl ? 'URL' : fileOrUrl.name} para ${path}`);
+    
+    let fileToUpload: Blob;
+
+    if (isUrl) {
       try {
-        addLog(`Tentando compressão de imagem...`);
-        fileToUpload = await compressImage(file);
-        addLog(`Arquivo após compressão: ${fileToUpload.size} bytes`);
-      } catch (e: any) {
-        addLog(`Falha na compressão: ${e.message}`, 'warn');
+        const response = await fetch(fileOrUrl, { referrerPolicy: 'no-referrer' });
+        const blob = await response.blob();
+        fileToUpload = blob;
+      } catch (e: unknown) {
+        throw new Error(`Falha ao buscar imagem da URL: ${e instanceof Error ? e.message : String(e)}`);
       }
+    } else {
+      fileToUpload = fileOrUrl;
     }
 
-    // Sanitize filename to avoid issues with special characters
-    const originalName = file.name || 'upload.jpg';
-    const sanitizedName = originalName.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+    const sanitizedName = isUrl ? `url_${Date.now()}.jpg` : fileOrUrl.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
     const storagePath = `${path}/${Date.now()}_${sanitizedName}`;
     const storageRef = ref(storage, storagePath);
     
-    addLog(`Referência de storage criada: ${storagePath}`);
+    addLog(`[NANO BANANA] Gravando em: ${storagePath}`);
     
     const uploadTask = uploadBytesResumable(storageRef, fileToUpload);
 
@@ -180,8 +189,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             addLog(`URL obtida com sucesso: ${url.substring(0, 30)}...`);
             setUploadProgress(0);
             resolve(url);
-          } catch (e: any) {
-            addLog(`Erro ao obter URL: ${e.message}`, 'error');
+          } catch (e: unknown) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            addLog(`Erro ao obter URL: ${errorMsg}`, 'error');
             reject(e);
           }
         }
@@ -208,9 +218,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen to app config
     const unsubConfig = onSnapshot(doc(db, 'config', 'current'), (snapshot) => {
       if (snapshot.exists()) {
-        setAppConfig(snapshot.data() as AppConfig);
+        const data = snapshot.data();
+        setAppConfig({
+          groupName: data.groupName || 'Incendeia Capoeira',
+          logoUrl: data.logoUrl || '',
+          primaryColor: data.primaryColor || '#CC0000',
+          secondaryColor: data.secondaryColor || '#FF6600',
+          fontFamily: data.fontFamily || 'font-black-ops',
+          activeTabs: data.activeTabs || ['home', 'gallery', 'chat', 'store'],
+          banners: data.banners || [],
+          mural: data.mural || '',
+          uiStyle: {
+            borderRadius: data.uiStyle?.borderRadius || '16px',
+            buttonStyle: data.uiStyle?.buttonStyle || 'neon',
+            animationsEnabled: data.uiStyle?.animationsEnabled ?? true,
+            headerStyle: data.uiStyle?.headerStyle || 'massive'
+          },
+          features: {
+            geminiEnabled: data.features?.geminiEnabled ?? true,
+            galleryEnabled: data.features?.galleryEnabled ?? true,
+            storeEnabled: data.features?.storeEnabled ?? true,
+            chatEnabled: data.features?.chatEnabled ?? true,
+            notificationsEnabled: data.features?.notificationsEnabled ?? true,
+            eventsEnabled: data.features?.eventsEnabled ?? true,
+          },
+          version: data.version || 1,
+          updatedAt: data.updatedAt,
+          updatedBy: data.updatedBy
+        } as AppConfig);
       } else {
-        console.log('No app config found');
+        console.log('No app config found, using defaults');
+        setAppConfig({
+          groupName: 'Incendeia Capoeira',
+          logoUrl: '',
+          primaryColor: '#CC0000',
+          fontFamily: 'font-black-ops',
+          activeTabs: ['home', 'gallery', 'chat', 'store'],
+          features: { 
+            geminiEnabled: true, 
+            galleryEnabled: true, 
+            storeEnabled: true, 
+            chatEnabled: true,
+            notificationsEnabled: true,
+            eventsEnabled: true
+          },
+          version: 1,
+          updatedAt: null,
+          updatedBy: ''
+        } as AppConfig);
       }
     }, (error) => {
       console.error('Config listener error:', error);
@@ -362,6 +417,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           handleFirestoreError(error, OperationType.GET, 'branches');
         });
         unsubs.push(unsubBranches);
+
+        // Listen to event notices
+        const noticesQuery = query(collection(db, 'eventNotices'), orderBy('date', 'desc'), limit(10));
+        const unsubNotices = onSnapshot(noticesQuery, (snapshot) => {
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventNotice));
+          setEventNotices(items);
+        }, (error) => {
+          handleFirestoreError(error, OperationType.GET, 'eventNotices');
+        });
+        unsubs.push(unsubNotices);
       } else {
         console.log('User is null, clearing state');
         setProfile(null);
@@ -393,6 +458,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAdmin && !appConfig && user) {
       const defaultConfig: AppConfig = {
+        groupName: 'Incendeia Capoeira',
         logoUrl: 'https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png',
         primaryColor: '#cc0000',
         fontFamily: 'Black Ops One',
@@ -401,7 +467,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           geminiEnabled: true,
           galleryEnabled: true,
           storeEnabled: true,
-          chatEnabled: true
+          chatEnabled: true,
+          notificationsEnabled: true,
+          eventsEnabled: true
+        },
+        uiStyle: {
+          borderRadius: '16px',
+          buttonStyle: 'neon',
+          animationsEnabled: true,
+          smokeEnabled: true,
+          fireEnabled: true,
+          vibrationEnabled: true,
+          particlesEnabled: true
         },
         version: 1,
         updatedAt: serverTimestamp(),
@@ -522,9 +599,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await signInWithEmailAndPassword(auth, emailToUse, password);
-    } catch (error: any) {
-      // Se o erro for email inválido mas tentamos usar um apelido, pode ser erro de formato
-      if (error.code === 'auth/invalid-email' && !nicknameOrEmail.includes('@')) {
+    } catch (error: unknown) {
+      if ((error as any).code === 'auth/invalid-email' && !nicknameOrEmail.includes('@')) {
         throw new Error("auth/invalid-credential");
       }
       throw error;
@@ -670,13 +746,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const uploadToGallery = async (file: File, description?: string) => {
+  const uploadToGallery = async (fileOrUrl: File | string, description?: string) => {
     if (!user) return;
-    const isVideo = file.type.startsWith('video/');
-    const fileType = isVideo ? 'video' : 'image';
+    
+    // Determine type (default to image for URLs unless specified)
+    let fileType: 'image' | 'video' = 'image';
+    if (typeof fileOrUrl !== 'string') {
+      fileType = fileOrUrl.type.startsWith('video/') ? 'video' : 'image';
+    } else {
+      // Very naive video check for URL
+      if (fileOrUrl.match(/\.(mp4|webm|ogg|mov)$/i)) fileType = 'video';
+    }
     
     try {
-      const url = await uploadFile(file, `gallery/${user.uid}`);
+      const url = await uploadFile(fileOrUrl, `gallery/${user.uid}`);
       
       await addDoc(collection(db, 'gallery'), {
         url,
@@ -943,12 +1026,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateBranch = async (id: string, data: Partial<Branch>) => {
+    if (!isAdmin) return;
+    try {
+      await updateDoc(doc(db, 'branches', id), data);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, 'branches/' + id);
+    }
+  };
+
   const deleteBranch = async (id: string) => {
     if (!isAdmin) return;
     try {
       await deleteDoc(doc(db, 'branches', id));
     } catch (e) {
       handleFirestoreError(e, OperationType.DELETE, 'branches/' + id);
+    }
+  };
+
+  const addEventNotice = async (data: Omit<EventNotice, 'id' | 'createdAt'>) => {
+    if (!isAdmin) return;
+    try {
+      await addDoc(collection(db, 'eventNotices'), {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, 'eventNotices');
+    }
+  };
+
+  const deleteEventNotice = async (id: string) => {
+    if (!isAdmin) return;
+    try {
+      await deleteDoc(doc(db, 'eventNotices', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'eventNotices/' + id);
     }
   };
 
@@ -1033,10 +1146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       markNotificationAsRead,
       requestNotificationPermission,
       addBranch,
+      updateBranch,
       deleteBranch,
       isAdmin,
       appConfig,
       updateAppConfig,
+      eventNotices,
+      addEventNotice,
+      deleteEventNotice,
       uploadProgress,
       uploadFile,
       developerMode,

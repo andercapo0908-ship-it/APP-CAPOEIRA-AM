@@ -67,6 +67,13 @@ service cloud.firestore {
       return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
     }
 
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -164,6 +171,26 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
     
+    match /eventNotices/{noticeId} {
+      allow get: if isAuthenticated() && isValidId(noticeId);
+      allow list: if isAuthenticated();
+      allow create: if isAdmin() && isValidId(noticeId) && 
+                      incoming().keys().hasAll(['title', 'description', 'importance', 'date', 'createdAt']) &&
+                      incoming().title is string && incoming().title.size() <= 200 &&
+                      incoming().description is string && incoming().description.size() <= 5000 &&
+                      incoming().importance in ['normal', 'high', 'urgent'] &&
+                      incoming().date is timestamp &&
+                      incoming().createdAt == request.time;
+      allow update: if isAdmin() && isValidId(noticeId) &&
+                      incoming().keys().hasAll(['title', 'description', 'importance', 'date', 'createdAt']) &&
+                      incoming().title is string && incoming().title.size() <= 200 &&
+                      incoming().description is string && incoming().description.size() <= 5000 &&
+                      incoming().importance in ['normal', 'high', 'urgent'] &&
+                      incoming().date is timestamp &&
+                      incoming().createdAt == request.time;
+      allow delete: if isAdmin() && isValidId(noticeId);
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

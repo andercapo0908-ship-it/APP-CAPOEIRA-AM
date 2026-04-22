@@ -1,10 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Anton&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Playfair+Display:wght@700&family=Oswald:wght@400;700&family=Bebas+Neue&family=Syne:wght@700&family=Space+Grotesk:wght@500;700&family=Staatliches&family=Michroma&family=Goldman:wght@400;700&family=Oxanium:wght@400;700&family=Press+Start+2P&family=Righteous&family=Bungee&family=Permanent+Marker&family=Rubik+Glitch&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-black-ops: "Black Ops One", system-ui, sans-serif;
+  --font-anton: "Anton", sans-serif;
+  --font-montserrat: "Montserrat", sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+  --font-playfair: "Playfair Display", serif;
+  --font-oswald: "Oswald", sans-serif;
+  --font-bebas: "Bebas Neue", sans-serif;
+  --font-syne: "Syne", sans-serif;
+  --font-space: "Space Grotesk", sans-serif;
+  --font-staat: "Staatliches", sans-serif;
+  --font-michroma: "Michroma", sans-serif;
+  --font-goldman: "Goldman", sans-serif;
+  --font-oxanium: "Oxanium", sans-serif;
+  --font-retro: "Press Start 2P", cursive;
+  --font-righteous: "Righteous", sans-serif;
+  --font-bungee: "Bungee", cursive;
+  --font-marker: "Permanent Marker", cursive;
+  --font-glitch: "Rubik Glitch", cursive;
   
   --color-premium-black: #050505;
   --color-incendeia-red: #cc0000;
@@ -21,6 +38,26 @@
 .font-black-ops {
   font-family: var(--font-black-ops);
 }
+
+.font-sans { font-family: var(--font-sans); }
+.font-mono { font-family: var(--font-mono); }
+.font-anton { font-family: var(--font-anton); }
+.font-montserrat { font-family: var(--font-montserrat); }
+.font-poppins { font-family: var(--font-poppins); }
+.font-playfair { font-family: var(--font-playfair); }
+.font-oswald { font-family: var(--font-oswald); }
+.font-bebas { font-family: var(--font-bebas); }
+.font-syne { font-family: var(--font-syne); }
+.font-space { font-family: var(--font-space); }
+.font-staat { font-family: var(--font-staat); }
+.font-michroma { font-family: var(--font-michroma); }
+.font-goldman { font-family: var(--font-goldman); }
+.font-oxanium { font-family: var(--font-oxanium); }
+.font-retro { font-family: var(--font-retro); }
+.font-righteous { font-family: var(--font-righteous); }
+.font-bungee { font-family: var(--font-bungee); }
+.font-marker { font-family: var(--font-marker); }
+.font-glitch { font-family: var(--font-glitch); }
 
 .text-flag-br {
   background: url('https://flagcdn.com/w640/br.png');

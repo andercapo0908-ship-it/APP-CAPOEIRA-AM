@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 interface State {
@@ -9,45 +9,32 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
+export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Erro capturado:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      let errorMessage = "Ocorreu um erro inesperado.";
-      
-      try {
-        if (this.state.error?.message) {
-          const parsed = JSON.parse(this.state.error.message);
-          if (parsed.error && parsed.operationType) {
-            errorMessage = `Erro de Permissão: Não foi possível realizar a operação de ${parsed.operationType} em ${parsed.path}.`;
-          } else {
-            errorMessage = this.state.error.message;
-          }
-        }
-      } catch (e) {
-        errorMessage = this.state.error?.message || errorMessage;
-      }
-
       return (
-        <div className="min-h-screen bg-premium-black flex items-center justify-center p-4 text-center">
-          <div className="bg-zinc-900 border border-incendeia-red/30 p-8 rounded-2xl max-w-md w-full">
-            <h2 className="text-2xl font-black-ops text-incendeia-red mb-4">OPS! ALGO DEU ERRADO</h2>
-            <p className="text-zinc-400 mb-6 text-sm">{errorMessage}</p>
+        <div className="min-h-screen bg-black flex items-center justify-center p-4 text-center">
+          <div className="bg-zinc-900 border border-red-600/30 p-8 rounded-2xl max-w-md w-full">
+            <h2 className="text-2xl font-bold text-red-600 mb-4">OPS! ALGO DEU ERRADO</h2>
+            <p className="text-zinc-400 mb-6 text-sm">
+              {this.state.error?.message || "Erro inesperado no app."}
+            </p>
             <button 
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-incendeia-red text-white font-black-ops rounded-lg hover:bg-red-700 transition-colors"
+              className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors"
             >
               RECARREGAR APP
             </button>

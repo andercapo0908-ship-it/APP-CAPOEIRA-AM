@@ -205,6 +205,20 @@
         "readBy": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["title", "body", "type", "createdAt"]
+    },
+    "EventNotice": {
+      "title": "Event Notice",
+      "description": "Notices and updates for recent events and classes displayed on the Home screen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "importance": { "type": "string", "enum": ["normal", "high", "urgent"] },
+        "date": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "importance", "date"]
     }
   },
   "firestore": {
@@ -259,6 +273,10 @@
     "/notifications/{notificationId}": {
       "schema": "Notification",
       "description": "App notifications"
+    },
+    "/eventNotices/{noticeId}": {
+      "schema": "EventNotice",
+      "description": "Home screen event notices and announcements"
     }
   }
 }
