@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Falha ao buscar imagem da URL: ${e instanceof Error ? e.message : String(e)}`);
       }
     } else {
-      fileToUpload = fileOrUrl;
+      fileToUpload = await compressImage(fileOrUrl as File);
     }
 
     const sanitizedName = isUrl ? `url_${Date.now()}.jpg` : fileOrUrl.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();

@@ -1,9 +1,23 @@
 import { GoogleGenAI, ThinkingLevel, Modality } from "@google/genai";
 import { AIChatMessage } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+// Lazy initialization to prevent crash on boot if API key is missing
+let aiInstance: GoogleGenAI | null = null;
+const getAI = () => {
+  if (!aiInstance) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key || key === 'undefined' || key === 'MY_GEMINI_API_KEY') {
+      console.warn("GEMINI_API_KEY is missing or invalid. AI features will be disabled.");
+      return null;
+    }
+    aiInstance = new GoogleGenAI({ apiKey: key });
+  }
+  return aiInstance;
+};
 
 export const generateAppAdvice = async (prompt: string) => {
+  const ai = getAI();
+  if (!ai) return "AI desativada. Chave de API não configurada.";
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3.1-pro-preview",
@@ -21,6 +35,8 @@ export const generateAppAdvice = async (prompt: string) => {
 };
 
 export const aiChat = async (messages: AIChatMessage[], systemInstruction: string) => {
+  const ai = getAI();
+  if (!ai) return "AI desativada. Chave de API não configurada.";
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -42,6 +58,8 @@ export const aiChat = async (messages: AIChatMessage[], systemInstruction: strin
 };
 
 export const textToSpeech = async (text: string) => {
+  const ai = getAI();
+  if (!ai) return null;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -73,6 +91,8 @@ export const textToSpeech = async (text: string) => {
 };
 
 export const analyzeGalleryContent = async (imageUrl: string) => {
+  const ai = getAI();
+  if (!ai) return "";
   try {
     // Convert URL to base64 for Gemini
     const response = await fetch(imageUrl);

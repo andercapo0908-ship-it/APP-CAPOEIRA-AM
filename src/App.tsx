@@ -20,6 +20,7 @@ import {
   Branch
 } from './types';
 import { storage } from './firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   LogOut, 
   ChevronLeft, 
@@ -399,6 +400,145 @@ const InkButton = ({
   );
 };
 
+const TestDbView = ({ setView }: { setView: (view: View) => void }) => {
+  const [status, setStatus] = useState("Pronto para começar!");
+  const [nomeArquivo, setNomeArquivo] = useState("");
+  const [arquivoFile, setArquivoFile] = useState<File | null>(null);
+
+  const testarBanco = async () => {
+    try {
+      setStatus("Enviando sinal para o banco...");
+      await addDoc(collection(db, "teste_conexao"), {
+        mensagem: "Incendeia Capoeira Online!",
+        horario: serverTimestamp()
+      });
+      setStatus("✅ CONEXÃO COM SUCESSO! O banco está funcionando.");
+    } catch (e) {
+      console.error(e);
+      setStatus("❌ Erro ao conectar no Firestore. Verifique as Regras (Rules) no Firebase.");
+    }
+  };
+
+  const aoSelecionarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      const arquivo = e.target.files[0];
+      setNomeArquivo(arquivo.name);
+      setArquivoFile(arquivo);
+      setStatus(`Foto "${arquivo.name}" selecionada! 🥋`);
+    }
+  };
+
+  const salvarNoFirebase = async () => {
+    if (!nomeArquivo || !arquivoFile) {
+      alert("Por favor, selecione uma foto na galeria primeiro!");
+      return;
+    }
+
+    try {
+      setStatus("Enviando para o banco de dados...");
+      // Salva os detalhes da foto no Firestore que você acabou de configurar
+      await addDoc(collection(db, "galeria_incendeia"), {
+        nome: nomeArquivo,
+        dataCriacao: serverTimestamp(),
+        tipo: "Upload Galeria"
+      });
+      setStatus("✅ SUCESSO! A foto foi registrada no sistema.");
+      
+      // Let's also do the actual storage upload that we had previously, to be complete.
+      const storageRef = ref(storage, `galeria_teste/${Date.now()}_${nomeArquivo}`);
+      const uploadTask = uploadBytesResumable(storageRef, arquivoFile);
+      uploadTask.on(
+        "state_changed",
+        () => {},
+        (error) => {
+          console.error("Erro no upload storage:", error);
+          setStatus(`❌ Erro no upload da foto: ${error.message}`);
+        },
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+            // Also save the URL
+            addDoc(collection(db, "teste_fotos"), {
+              url: downloadURL,
+              createdAt: serverTimestamp(),
+              nome: nomeArquivo
+            });
+            setStatus("✅ SUCESSO! Foto e arquivo registrados no sistema.");
+            setNomeArquivo(""); // Limpa para a próxima
+            setArquivoFile(null);
+          });
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      setStatus("❌ Erro ao salvar. Verifique se o Firebase está conectado.");
+    }
+  };
+
+  return (
+    <div style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', textAlign: 'center', fontFamily: 'sans-serif' }} className="fixed inset-0 z-[200] overflow-y-auto">
+      <div className="flex justify-start mb-4">
+        <button onClick={() => setView('login')} className="text-incendeia-orange flex items-center">
+          <ChevronLeft className="w-6 h-6" /> Voltar
+        </button>
+      </div>
+
+      <header style={{ borderBottom: '2px solid #eab308', paddingBottom: '15px', marginBottom: '30px' }}>
+        <h1 style={{ color: '#eab308', margin: 0, fontSize: '24px', fontWeight: 'bold' }}>INCENDEIA CAPOEIRA PRO</h1>
+        <p style={{ color: '#888' }}>Sistema de Gestão Proep 2026 / Teste e Diagnóstico</p>
+      </header>
+
+      <div style={{ backgroundColor: '#111', border: '1px solid #333', padding: '25px', borderRadius: '15px', maxWidth: '400px', margin: '0 auto' }}>
+        <h3 style={{ marginBottom: '20px' }} className="text-zinc-300">{status}</h3>
+        
+        <button 
+          onClick={testarBanco}
+          style={{ backgroundColor: '#eab308', color: '#000', border: 'none', padding: '10px 20px', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer', marginBottom: '30px', width: '100%' }}
+        >
+          TESTAR CONEXÃO DO BANCO
+        </button>
+
+        <label style={{ 
+          display: 'block', 
+          backgroundColor: '#222', 
+          padding: '15px', 
+          borderRadius: '8px', 
+          cursor: 'pointer',
+          border: '1px dashed #eab308',
+          marginBottom: '20px'
+        }}>
+          📸 SELECIONAR DA GALERIA
+          <input type="file" onChange={aoSelecionarFoto} accept="image/*" style={{ display: 'none' }} />
+        </label>
+
+        {nomeArquivo && (
+          <p style={{ color: '#eab308', marginBottom: '20px' }}>Arquivo: {nomeArquivo}</p>
+        )}
+
+        <button 
+          onClick={salvarNoFirebase}
+          style={{ 
+            backgroundColor: '#eab308', 
+            color: '#000', 
+            border: 'none', 
+            padding: '15px', 
+            fontWeight: 'bold', 
+            borderRadius: '8px', 
+            width: '100%',
+            fontSize: '1.1rem',
+            cursor: 'pointer'
+          }}
+        >
+          SALVAR NO APP
+        </button>
+      </div>
+
+      <footer style={{ marginTop: '40px', color: '#444', fontSize: '0.9rem' }}>
+        Conectado ao projeto: app-incendeia-2026-oficial
+      </footer>
+    </div>
+  );
+};
+
 const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }: { 
   t: (pt: string, es: string) => string; 
   setAuthRole: (role: 'member' | 'admin') => void; 
@@ -541,6 +681,12 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }:
         >
           {t('PAINEL ADM', 'PANEL ADM')}
         </InkButton>
+        <button 
+          onClick={() => { setView('test-db' as View); }} 
+          className="w-full py-2 bg-[#eab308] text-black font-bold rounded-lg mt-4 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform"
+        >
+          {t('TESTAR CONEXÃO DO APP', 'PROBAR CONEXIÓN DE LA APP')}
+        </button>
       </div>
 
       <Footer t={t} />
@@ -891,9 +1037,12 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   isAdmin: boolean;
 }) => {
-  const { trainingLogs, addTrainingLog, userGallery, uploadToGallery, deleteGalleryItem, user } = useAuth();
+  const { trainingLogs, addTrainingLog, userGallery, uploadToGallery, deleteGalleryItem, user, uploadProfilePhoto, updateProfile, uploadProgress } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<{file: File, url: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const graduationColor = GRADUATIONS.find(g => g.name === profile?.graduation)?.color || '#ffffff';
   
   const now = new Date();
@@ -918,6 +1067,29 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
     { emoji: '😢', label: 'Triste' },
     { emoji: '⚡', label: 'Motivado' }
   ];
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setAvatarPreview({ file, url });
+    // Reset file input so same file can be selected again if canceled
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  const confirmAvatarUpload = async () => {
+    if (!avatarPreview) return;
+    setIsUploadingAvatar(true);
+    try {
+      const url = await uploadProfilePhoto(avatarPreview.file);
+      await updateProfile({ photoURL: url });
+      setAvatarPreview(null);
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1007,11 +1179,29 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
               ))}
             </div>
 
-            <div className="w-28 h-28 rounded-full border-4 border-premium-black p-1 relative z-10 overflow-hidden bg-zinc-800 shadow-2xl">
+            <div 
+              onClick={() => !isUploadingAvatar && avatarInputRef.current?.click()}
+              className="w-28 h-28 rounded-full border-4 border-premium-black p-1 relative z-10 overflow-hidden bg-zinc-800 shadow-2xl cursor-pointer group"
+            >
               <LazyImage 
                 src={profile?.photoURL || "https://picsum.photos/seed/capoeira-user/200/200"} 
                 alt={profile?.nickname || 'Profile'} 
-                className="w-full h-full rounded-full object-cover" 
+                className={`w-full h-full rounded-full object-cover transition-opacity ${isUploadingAvatar ? 'opacity-50' : 'group-hover:opacity-70'}`} 
+              />
+              <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${isUploadingAvatar ? 'opacity-100 bg-black/50' : 'opacity-0 group-hover:opacity-100 bg-black/30'}`}>
+                {isUploadingAvatar ? (
+                   <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                   <Banana className="w-8 h-8 text-white drop-shadow-lg" />
+                )}
+              </div>
+              <input 
+                ref={avatarInputRef}
+                type="file" 
+                onChange={handleAvatarSelect} 
+                className="hidden" 
+                accept="image/*,.heic,.heif,.webp"
+                disabled={isUploadingAvatar}
               />
             </div>
           </div>
@@ -1023,6 +1213,56 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
           </div>
         </div>
       </div>
+
+      {/* Avatar Preview Modal */}
+      <AnimatePresence>
+        {avatarPreview && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              onClick={() => !isUploadingAvatar && setAvatarPreview(null)} 
+              className="fixed inset-0 bg-black/90 z-[300] backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.9, opacity: 0 }} 
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-sm bg-zinc-900 z-[310] rounded-[32px] border border-white/10 p-6 shadow-2xl flex flex-col items-center gap-6"
+            >
+              <h3 className="text-lg font-black-ops text-white uppercase tracking-widest">{t('CONFIRMAR NOVA FOTO', 'CONFIRMAR NUEVA FOTO')}</h3>
+              
+              <div className="w-40 h-40 rounded-full border-4 border-incendeia-orange overflow-hidden relative shadow-[0_0_20px_rgba(255,102,0,0.4)]">
+                <img src={avatarPreview.url} className="w-full h-full object-cover" alt="Preview" />
+                {isUploadingAvatar && (
+                  <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center backdrop-blur-[2px]">
+                    <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin mb-2" />
+                    <span className="text-white text-xs font-bold">{Math.round(uploadProgress)}%</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex w-full gap-3">
+                <Button 
+                  variant="danger" 
+                  className="flex-1" 
+                  onClick={() => setAvatarPreview(null)}
+                  disabled={isUploadingAvatar}
+                >
+                  {t('CANCELAR', 'CANCELAR')}
+                </Button>
+                <Button 
+                  className="flex-1 flex gap-2 items-center justify-center" 
+                  onClick={confirmAvatarUpload}
+                  disabled={isUploadingAvatar}
+                >
+                  <Upload className="w-4 h-4" />
+                  {t('ENVIAR', 'ENVIAR')}
+                </Button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <div className="p-6 -mt-6 relative z-20">
         {/* Check-in Section */}
@@ -1706,7 +1946,12 @@ const GalleryView = ({ t, setView, isAdmin, showConfirm, showAlert }: {
                   onClick={handleUpload}
                   className="flex-1 py-4 rounded-xl text-[10px] font-bold uppercase tracking-widest bg-incendeia-red text-white shadow-lg shadow-incendeia-red/20 hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
                 >
-                  {isUploading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('POSTAR', 'PUBLICAR')}
+                  {isUploading ? (
+                    <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                       {Math.round(uploadProgress)}%
+                    </div>
+                  ) : t('POSTAR', 'PUBLICAR')}
                 </button>
               </div>
             </motion.div>
@@ -4151,6 +4396,7 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'content' | 'config' | 'style' | 'ai'>('dashboard');
   const [contentSubTab, setContentSubTab] = useState<'masters' | 'store' | 'events' | 'branches' | 'gallery'>('masters');
   const [configSubTab, setConfigSubTab] = useState<'general' | 'banners' | 'social'>('general');
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiResponse, setAiResponse] = useState('');
@@ -4711,7 +4957,7 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
                           {isUploading && uploadContext?.type === 'event' && uploadContext?.id === ev.id ? (
                             <div className="w-4 h-4 border-2 border-incendeia-orange border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            <Camera className="w-4 h-4 text-white" />
+                            <Banana className="w-4 h-4 text-white" />
                           )}
                           <input 
                             type="file" 
@@ -4891,23 +5137,75 @@ const AdminPanelView = ({ t, showConfirm, showAlert }: {
                     <input type="file" onChange={(e) => handleDirectUpload(e, 'banner')} className="hidden" accept="image/*,video/*" disabled={isUploading} />
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {appConfig?.banners?.map((url, idx) => (
-                    <div key={idx} className="relative group aspect-video rounded-2xl overflow-hidden border border-white/5">
-                      <LazyImage src={url} alt={`Banner ${idx}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <div className="flex flex-col gap-4">
+                  {appConfig?.banners && appConfig.banners.length > 0 ? (
+                    <div className="relative aspect-video rounded-3xl overflow-hidden border border-white/10 group bg-black/40">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={currentBannerIndex}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.3 }}
+                          className="w-full h-full absolute inset-0"
+                        >
+                          <LazyImage src={appConfig.banners[currentBannerIndex]} alt={`Banner ${currentBannerIndex}`} className="w-full h-full object-cover" />
+                        </motion.div>
+                      </AnimatePresence>
+                      
+                      {/* Carousel Controls */}
+                      {appConfig.banners.length > 1 && (
+                        <>
+                          <button 
+                            onClick={() => setCurrentBannerIndex((prev) => (prev > 0 ? prev - 1 : appConfig.banners!.length - 1))}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-incendeia-orange text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={() => setCurrentBannerIndex((prev) => (prev < appConfig.banners!.length - 1 ? prev + 1 : 0))}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-incendeia-orange text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Delete Button */}
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={() => {
-                            const newBanners = appConfig.banners?.filter((_, i) => i !== idx);
+                            const newBanners = appConfig.banners?.filter((_, i) => i !== currentBannerIndex);
                             handleUpdateConfig({ banners: newBanners });
+                            if (currentBannerIndex >= (newBanners?.length || 0)) {
+                              setCurrentBannerIndex(Math.max(0, (newBanners?.length || 1) - 1));
+                            }
                           }}
-                          className="p-2 bg-red-500 text-white rounded-lg"
+                          className="p-3 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-lg backdrop-blur-md transition-all flex items-center gap-2"
                         >
-                          <Trash className="w-4 h-4" />
+                          <Trash className="w-5 h-5" />
+                          <span className="text-xs font-bold font-black-ops tracking-widest">{t('EXCLUIR', 'ELIMINAR')}</span>
                         </button>
                       </div>
+
+                      {/* Carousel Indicators */}
+                      {appConfig.banners.length > 1 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                          {appConfig.banners.map((_, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => setCurrentBannerIndex(idx)}
+                              className={`w-2 h-2 rounded-full transition-all ${idx === currentBannerIndex ? 'bg-incendeia-orange w-6' : 'bg-white/50 hover:bg-white'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="aspect-video flex items-center justify-center border-2 border-dashed border-white/10 rounded-3xl bg-white/5">
+                      <p className="text-zinc-500 font-bold tracking-widest uppercase">{t('NENHUM BANNER CARREGADO', 'NINGÚN BANNER CARGADO')}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -5309,7 +5607,7 @@ function AppContent() {
     unreadNotificationsCount
   } = useAuth();
   const [lang, setLang] = useState<Language>('pt');
-  const [view, setView] = useState<View>('login');
+  const [view, setView] = useState<View>('splash');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authRole, setAuthRole] = useState<'member' | 'admin'>('member');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -5371,6 +5669,34 @@ function AppContent() {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as View;
+      const validViews = [
+        'splash', 'login', 'auth', 'home', 'profile', 'edit-profile', 
+        'gallery', 'masters', 'calendar', 'store', 'finance', 'chat', 
+        'users', 'admin-panel', 'ai-chat', 'notifications', 'graduations', 'branches'
+      ];
+      if (validViews.includes(hash)) {
+        setView(hash);
+      }
+    };
+    // Initialize view from hash if present
+    if (window.location.hash) {
+      onHashChange();
+    }
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (view && view !== 'splash') {
+      if (window.location.hash !== `#${view}`) {
+        window.history.replaceState(null, '', `#${view}`);
+      }
+    }
+  }, [view]);
 
   useEffect(() => {
     if (loading) return;
@@ -5454,7 +5780,27 @@ function AppContent() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-premium-black flex items-center justify-center"><div className="w-12 h-12 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-premium-black flex flex-col items-center justify-center p-8">
+      <motion.div 
+        animate={{ scale: [1, 1.1, 1], rotate: [0, 360] }}
+        transition={{ duration: 2, repeat: Infinity }}
+        className="w-24 h-24 mb-6"
+      >
+        <img 
+          src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
+          className="w-full h-full object-contain mix-blend-screen" 
+          alt="Loading..."
+        />
+      </motion.div>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-incendeia-red border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-black-ops tracking-widest text-[10px] uppercase animate-pulse">
+          {t('CARREGANDO ENERGIA...', 'CARGANDO ENERGÍA...')}
+        </p>
+      </div>
+    </div>
+  );
 
   return (
     <div 
@@ -5479,6 +5825,10 @@ function AppContent() {
               handleAuth={handleAuth}
               appConfig={appConfig}
             />
+          </motion.div>
+        ) : view === 'test-db' ? (
+          <motion.div key="test-db" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+             <TestDbView setView={setView} />
           </motion.div>
         ) : (
           <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-24">

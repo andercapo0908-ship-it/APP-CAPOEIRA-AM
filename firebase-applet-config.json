@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0123274240",
-  "appId": "1:201955529651:web:b50016bd19d3a3b03b71c6",
-  "apiKey": "AIzaSyAtI8tbH2P3uxUl_rde_oqkdwY5_rOfwTI",
-  "authDomain": "gen-lang-client-0123274240.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-83dc49c2-e282-4e95-becc-1adc6fb85854",
-  "storageBucket": "gen-lang-client-0123274240.firebasestorage.app",
-  "messagingSenderId": "201955529651",
+  "projectId": "app-incendeia-2026-oficial",
+  "appId": "1:460849268448:web:9544222c193f78c6cf7285",
+  "apiKey": "AIzaSyB41A88rpLSxZBq4V3OcN6JwWgwf-NgJgE",
+  "authDomain": "app-incendeia-2026-oficial.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "app-incendeia-2026-oficial.appspot.com",
+  "messagingSenderId": "460849268448",
   "measurementId": ""
 }

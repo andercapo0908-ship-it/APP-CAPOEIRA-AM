@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "460849268448",
+    "project_id": "app-incendeia-2026-oficial",
+    "storage_bucket": "app-incendeia-2026-oficial.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:460849268448:android:9544222c193f78c6cf7285",
+        "android_client_info": {
+          "package_name": "com.company.incendeiaapp24abril"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB41A88rpLSxZBq4V3OcN6JwWgwf-NgJgE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

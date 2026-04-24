@@ -78,6 +78,18 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    match /teste_conexao/{testId} {
+      allow read, write: if true; // Only for testing
+    }
+    
+    match /teste_fotos/{testId} {
+      allow read, write: if true; // Only for testing
+    }
+    
+    match /galeria_incendeia/{testId} {
+      allow read, write: if true; // Only for testing
+    }
+
     match /config/{configId} {
       allow read: if true; // Allow public read for app configuration (logo, colors)
       allow write: if isAdmin();

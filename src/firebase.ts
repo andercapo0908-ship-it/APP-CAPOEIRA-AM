@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, inMemoryPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore, doc, setLogLevel } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -11,6 +11,10 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 setLogLevel('error');
 
 export const auth = getAuth(app);
+
+// FORÇAR LOGIN A CADA ATUALIZAÇÃO: Exigido para evitar que o app lembre o usuário após um F5
+setPersistence(auth, inMemoryPersistence).catch(console.error);
+
 export const storage = getStorage(app);
 
 

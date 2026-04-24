@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type Language = 'pt' | 'es';
 
-export type View = 'splash' | 'login' | 'auth' | 'home' | 'profile' | 'edit-profile' | 'gallery' | 'masters' | 'calendar' | 'store' | 'finance' | 'chat' | 'users' | 'admin-panel' | 'ai-chat' | 'notifications' | 'graduations' | 'branches';
+export type View = 'splash' | 'login' | 'auth' | 'home' | 'profile' | 'edit-profile' | 'gallery' | 'masters' | 'calendar' | 'store' | 'finance' | 'chat' | 'users' | 'admin-panel' | 'ai-chat' | 'notifications' | 'graduations' | 'branches' | 'test-db';
 
 export interface Graduation {
   id: string;
