@@ -403,71 +403,30 @@ const InkButton = ({
 const TestDbView = ({ setView }: { setView: (view: View) => void }) => {
   const [status, setStatus] = useState("Pronto para começar!");
   const [nomeArquivo, setNomeArquivo] = useState("");
-  const [arquivoFile, setArquivoFile] = useState<File | null>(null);
-
-  const testarBanco = async () => {
-    try {
-      setStatus("Enviando sinal para o banco...");
-      await addDoc(collection(db, "teste_conexao"), {
-        mensagem: "Incendeia Capoeira Online!",
-        horario: serverTimestamp()
-      });
-      setStatus("✅ CONEXÃO COM SUCESSO! O banco está funcionando.");
-    } catch (e) {
-      console.error(e);
-      setStatus("❌ Erro ao conectar no Firestore. Verifique as Regras (Rules) no Firebase.");
-    }
-  };
 
   const aoSelecionarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const arquivo = e.target.files[0];
       setNomeArquivo(arquivo.name);
-      setArquivoFile(arquivo);
       setStatus(`Foto "${arquivo.name}" selecionada! 🥋`);
     }
   };
 
   const salvarNoFirebase = async () => {
-    if (!nomeArquivo || !arquivoFile) {
+    if (!nomeArquivo) {
       alert("Por favor, selecione uma foto na galeria primeiro!");
       return;
     }
 
     try {
       setStatus("Enviando para o banco de dados...");
-      // Salva os detalhes da foto no Firestore que você acabou de configurar
       await addDoc(collection(db, "galeria_incendeia"), {
         nome: nomeArquivo,
         dataCriacao: serverTimestamp(),
         tipo: "Upload Galeria"
       });
       setStatus("✅ SUCESSO! A foto foi registrada no sistema.");
-      
-      // Let's also do the actual storage upload that we had previously, to be complete.
-      const storageRef = ref(storage, `galeria_teste/${Date.now()}_${nomeArquivo}`);
-      const uploadTask = uploadBytesResumable(storageRef, arquivoFile);
-      uploadTask.on(
-        "state_changed",
-        () => {},
-        (error) => {
-          console.error("Erro no upload storage:", error);
-          setStatus(`❌ Erro no upload da foto: ${error.message}`);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-            // Also save the URL
-            addDoc(collection(db, "teste_fotos"), {
-              url: downloadURL,
-              createdAt: serverTimestamp(),
-              nome: nomeArquivo
-            });
-            setStatus("✅ SUCESSO! Foto e arquivo registrados no sistema.");
-            setNomeArquivo(""); // Limpa para a próxima
-            setArquivoFile(null);
-          });
-        }
-      );
+      setNomeArquivo(""); // Limpa para a próxima
     } catch (error) {
       console.error(error);
       setStatus("❌ Erro ao salvar. Verifique se o Firebase está conectado.");
@@ -483,20 +442,13 @@ const TestDbView = ({ setView }: { setView: (view: View) => void }) => {
       </div>
 
       <header style={{ borderBottom: '2px solid #eab308', paddingBottom: '15px', marginBottom: '30px' }}>
-        <h1 style={{ color: '#eab308', margin: 0, fontSize: '24px', fontWeight: 'bold' }}>INCENDEIA CAPOEIRA PRO</h1>
-        <p style={{ color: '#888' }}>Sistema de Gestão Proep 2026 / Teste e Diagnóstico</p>
+        <h1 style={{ color: '#eab308', margin: 0 }}>INCENDEIA CAPOEIRA</h1>
+        <p style={{ color: '#888' }}>Sistema de Gestão Proep 2026</p>
       </header>
 
-      <div style={{ backgroundColor: '#111', border: '1px solid #333', padding: '25px', borderRadius: '15px', maxWidth: '400px', margin: '0 auto' }}>
-        <h3 style={{ marginBottom: '20px' }} className="text-zinc-300">{status}</h3>
+      <div style={{ backgroundColor: '#111', border: '1px solid #333', padding: '25px', borderRadius: '15px' }}>
+        <h3 style={{ marginBottom: '20px' }}>{status}</h3>
         
-        <button 
-          onClick={testarBanco}
-          style={{ backgroundColor: '#eab308', color: '#000', border: 'none', padding: '10px 20px', fontWeight: 'bold', borderRadius: '5px', cursor: 'pointer', marginBottom: '30px', width: '100%' }}
-        >
-          TESTAR CONEXÃO DO BANCO
-        </button>
-
         <label style={{ 
           display: 'block', 
           backgroundColor: '#222', 
@@ -5775,6 +5727,18 @@ function AppContent() {
       }
       if (errorCode === 'auth/weak-password') {
         return t('A senha é muito fraca', 'La contraseña es muy débil');
+      }
+      if (errorCode === 'auth/operation-not-allowed') {
+        return t(
+          'Método de login por Email/Senha não está ativado. Ative-o na aba Authentication do projeto no Firebase Console.', 
+          'El método de inicio de sesión por Correo/Contraseña no está activado. Actívelo en la pestaña Authentication del proyecto en Firebase Console.'
+        );
+      }
+      if (errorCode === 'auth/configuration-not-found') {
+        return t(
+          'Configuração do Firebase ausente. Ative o provedor de Email na aba Authentication no Console do Firebase.',
+          'Configuración de Firebase ausente. Active el proveedor de Email en la pestaña Authentication en el Consola de Firebase.'
+        );
       }
       return (error as any).message || t("Erro na autenticação", "Error en la autenticación");
     }
