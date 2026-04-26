@@ -61,6 +61,25 @@
 .font-glitch { font-family: var(--font-glitch); }
 .font-suez { font-family: var(--font-suez); }
 
+.text-outline-orange {
+  -webkit-text-stroke: 1px var(--color-incendeia-orange);
+}
+
+.text-melt {
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 60%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0) 100%);
+  position: relative;
+}
+
+.text-melt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('https://www.transparenttextures.com/patterns/graphy.png');
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .text-professional-texture {
   background: url('https://www.transparenttextures.com/patterns/black-linen.png'), linear-gradient(180deg, #fff 0%, #ccc 100%);
   -webkit-background-clip: text;

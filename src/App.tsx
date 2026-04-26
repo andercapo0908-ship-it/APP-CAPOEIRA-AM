@@ -108,67 +108,37 @@ const GRADUATIONS = [
 // --- Components ---
 
 const RotatingArcs = ({ size = "md", color1 = "var(--color-incendeia-red)", color2 = "var(--color-incendeia-orange)" }: { size?: "sm" | "md" | "lg"; color1?: string; color2?: string }) => {
-  const insets = {
-    sm: { arc1: "-inset-1", arc2: "-inset-2" },
-    md: { arc1: "-inset-2", arc2: "-inset-4" },
-    lg: { arc1: "-inset-4", arc2: "-inset-8" }
-  };
-  
-  const currentInsets = insets[size];
-  
-  return (
-    <>
-      <motion.div 
-        animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-        className={`absolute ${currentInsets.arc1} border-2 rounded-full opacity-80 pointer-events-none`}
-        style={{ 
-          borderColor: color2,
-          boxShadow: `0 0 10px ${color2}, inset 0 0 10px ${color2}`,
-          transformStyle: 'preserve-3d',
-          willChange: 'transform'
-        }}
-      />
-      <motion.div 
-        animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
-        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className={`absolute ${currentInsets.arc2} border-2 rounded-full opacity-60 pointer-events-none`}
-        style={{ 
-          borderColor: color1,
-          boxShadow: `0 0 8px ${color1}, inset 0 0 8px ${color1}`,
-          transformStyle: 'preserve-3d',
-          willChange: 'transform'
-        }}
-      />
-    </>
-  );
+  return null;
 };
 
 const MainTitle = ({ size = "lg" }: { size?: "sm" | "lg" }) => {
   const containerClass = size === "lg" ? "text-5xl md:text-7xl" : "text-3xl md:text-5xl";
-  const proClass = size === "lg" ? "text-lg md:text-xl" : "text-[10px] md:text-xs";
+  const proClass = size === "lg" ? "text-sm md:text-base" : "text-[8px] md:text-[10px]";
   const capoeiraClass = size === "lg" ? "text-4xl md:text-6xl" : "text-2xl md:text-4xl";
 
   return (
     <div className="flex flex-col items-center font-suez tracking-tight py-4">
-      <div className="relative text-shine-effect">
-        <span className={`${containerClass} text-professional-texture uppercase`}>
-          INCENDEIA
-        </span>
-      </div>
-      <div className="flex items-center gap-2 -mt-1 md:-mt-3">
-        <span className={`${capoeiraClass} text-professional-texture uppercase text-shine-effect`}>
-          CAPOEIRA
-        </span>
+      <div className="relative">
+        <div className="relative text-shine-effect text-melt">
+          <span className={`${containerClass} text-professional-texture uppercase text-outline-orange`}>
+            INCENDEIA
+          </span>
+        </div>
+        {/* PRO positioned over the 'A' */}
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white px-2 py-0.5 rounded border-2 border-incendeia-orange shadow-[0_0_15px_rgba(255,102,0,0.5)] transform -rotate-12"
+          className="absolute -top-4 right-0 bg-white px-1.5 py-0.5 rounded border border-incendeia-orange shadow-[0_0_10px_rgba(255,102,0,0.5)] z-20"
         >
           <span className={`${proClass} text-incendeia-red font-black tracking-tighter`}>
             PRO
           </span>
         </motion.div>
+      </div>
+      <div className="flex items-center gap-2 -mt-1 md:-mt-3">
+        <span className={`${capoeiraClass} text-professional-texture uppercase text-shine-effect text-melt text-outline-orange`}>
+          CAPOEIRA
+        </span>
       </div>
     </div>
   );
@@ -301,9 +271,12 @@ const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, auto
 
 const Footer = ({ t }: { t: (pt: string, es: string) => string }) => {
   return (
-    <div className="mt-8 py-4 flex flex-col items-center z-10 opacity-30">
-      <p className="text-zinc-500 text-[8px] font-bold uppercase tracking-[0.3em] text-center">
-        incendeia capoeira pro app oficial
+    <div className="mt-8 py-4 flex flex-col items-center z-10">
+      <p className="text-white text-[10px] font-bold uppercase tracking-[0.3em] text-center">
+        INCENDEIA PRO APP OFICIAL
+      </p>
+      <p className="text-white/60 text-[8px] font-bold uppercase tracking-[0.2em] text-center mt-1">
+        DESENVOLVIDO POR MESTRE DUENDE
       </p>
     </div>
   );
@@ -1942,15 +1915,25 @@ const GalleryItemDetail = ({
     return () => unsub();
   }, [item.id]);
 
-  const handlePrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
 
-  const handleNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (currentIndex < items.length - 1) setCurrentIndex(currentIndex + 1);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') handlePrev();
+      if (e.key === 'ArrowRight') handleNext();
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentIndex, items.length]);
 
   const emojis = ['🔥', '👏', '💪', '❤️', '🤸', '🥋'];
 
@@ -1973,20 +1956,56 @@ const GalleryItemDetail = ({
         className="fixed inset-0 bg-black/95 z-[200] backdrop-blur-lg"
       />
       <motion.div 
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        initial={{ y: '100%' }} 
+        animate={{ y: 0 }} 
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className="fixed bottom-0 left-0 right-0 bg-zinc-900 z-[210] rounded-t-[40px] border-t border-incendeia-red/30 flex flex-col max-h-[90vh]"
       >
         <div className="w-12 h-1.5 bg-zinc-800 rounded-full mx-auto my-4 shrink-0" />
         
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1 bg-white/5 rounded-full backdrop-blur-md border border-white/5 z-[220]">
+          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">
+            {currentIndex + 1} / {items.length}
+          </span>
+        </div>
+
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 w-10 h-10 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center text-zinc-400 hover:text-white transition-all z-[220]"
+        >
+          <X className="w-6 h-6" />
+        </button>
+        
         <div className="overflow-y-auto flex-1 p-6">
-          <div className="aspect-square rounded-3xl overflow-hidden mb-6 bg-black border border-white/5 relative group">
-            {item.type === 'video' ? (
-              <LazyVideo src={item.url} className="w-full h-full" objectFit="contain" controls autoPlay />
-            ) : (
-              <LazyImage src={item.url} alt={item.description || 'Gallery image'} className="w-full h-full" objectFit="contain" />
-            )}
+          <motion.div 
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(_, info) => {
+              if (info.offset.x > 100) handlePrev();
+              else if (info.offset.x < -100) handleNext();
+            }}
+            className="aspect-square rounded-3xl overflow-hidden mb-6 bg-black border border-white/5 relative group cursor-grab active:cursor-grabbing"
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="w-full h-full"
+              >
+                {item.type === 'video' ? (
+                  <LazyVideo src={item.url} className="w-full h-full" objectFit="contain" controls autoPlay />
+                ) : (
+                  <LazyImage src={item.url} alt={item.description || 'Gallery image'} className="w-full h-full" objectFit="contain" />
+                )}
+              </motion.div>
+            </AnimatePresence>
             
-            {/* Navigation Buttons */}
+            {/* Navigation Buttons (Desktop visible, mobile swipe) */}
             {currentIndex > 0 && (
               <button 
                 onClick={handlePrev}
@@ -2003,7 +2022,7 @@ const GalleryItemDetail = ({
                 <ChevronRight className="w-6 h-6" />
               </button>
             )}
-          </div>
+          </motion.div>
 
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
