@@ -23,7 +23,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (
-          (request.auth.token.email.matches("andercapo0908@.*")) ||
+          (request.auth.token.email.matches("andercapo0908@.*") || request.auth.token.email == "incendeiaproapp2026@gmail.com") ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
         );

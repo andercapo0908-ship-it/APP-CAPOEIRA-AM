@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Anton&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Playfair+Display:wght@700&family=Oswald:wght@400;700&family=Bebas+Neue&family=Syne:wght@700&family=Space+Grotesk:wght@500;700&family=Staatliches&family=Michroma&family=Goldman:wght@400;700&family=Oxanium:wght@400;700&family=Press+Start+2P&family=Righteous&family=Bungee&family=Permanent+Marker&family=Rubik+Glitch&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Anton&family=Montserrat:wght@400;700&family=Poppins:wght@400;700&family=Playfair+Display:wght@700&family=Oswald:wght@400;700&family=Bebas+Neue&family=Syne:wght@700&family=Space+Grotesk:wght@500;700&family=Staatliches&family=Michroma&family=Goldman:wght@400;700&family=Oxanium:wght@400;700&family=Press+Start+2P&family=Righteous&family=Bungee&family=Permanent+Marker&family=Rubik+Glitch&family=Suez+One&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -22,6 +22,7 @@
   --font-bungee: "Bungee", cursive;
   --font-marker: "Permanent Marker", cursive;
   --font-glitch: "Rubik Glitch", cursive;
+  --font-suez: "Suez One", serif;
   
   --color-premium-black: #050505;
   --color-incendeia-red: #cc0000;
@@ -58,24 +59,40 @@
 .font-bungee { font-family: var(--font-bungee); }
 .font-marker { font-family: var(--font-marker); }
 .font-glitch { font-family: var(--font-glitch); }
+.font-suez { font-family: var(--font-suez); }
 
-.text-flag-br {
-  background: url('https://flagcdn.com/w640/br.png');
-  background-size: cover;
-  background-position: center;
+.text-professional-texture {
+  background: url('https://www.transparenttextures.com/patterns/black-linen.png'), linear-gradient(180deg, #fff 0%, #ccc 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
-.text-flag-es {
-  background: url('https://flagcdn.com/w640/es.png');
-  background-size: cover;
-  background-position: center;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+.text-shine-effect {
+  position: relative;
+  overflow: hidden;
 }
+
+.text-shine-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: skewX(-20deg);
+  animation: text-shine 3s infinite;
+}
+
+@keyframes text-shine {
+  0% { left: -100%; }
+  20% { left: 200%; }
+  100% { left: 200%; }
+}
+
+/* Removed flag text overlays as requested */
+
 
 .ink-splash-orange {
   position: absolute;

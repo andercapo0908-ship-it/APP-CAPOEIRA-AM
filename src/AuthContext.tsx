@@ -290,7 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('Profile loaded:', data.nickname);
             
             // Auto-promote special admin
-            const isSpecial = firebaseUser.email?.startsWith('andercapo0908') || data.nickname?.toLowerCase() === 'andercapo0908';
+            const isSpecial = firebaseUser.email?.startsWith('andercapo0908') || firebaseUser.email === 'incendeiaproapp2026@gmail.com' || data.nickname?.toLowerCase() === 'andercapo0908';
             if (isSpecial && data.role !== 'admin') {
               updateDoc(userDocRef, { role: 'admin' }).catch(console.error);
             }
@@ -462,7 +462,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const isSpecialAdmin = user?.email?.startsWith('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
+    const isSpecialAdmin = user?.email?.startsWith('andercapo0908') || user?.email === 'incendeiaproapp2026@gmail.com' || profile?.nickname?.toLowerCase() === 'andercapo0908';
     setIsAdmin(profile?.role === 'admin' || isSpecialAdmin);
   }, [user, profile?.role, profile?.nickname]);
 
@@ -504,7 +504,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const isSpecialAdmin = user?.email?.toLowerCase().includes('andercapo0908') || profile?.nickname?.toLowerCase() === 'andercapo0908';
+    const isSpecialAdmin = user?.email?.toLowerCase().includes('andercapo0908') || user?.email === 'incendeiaproapp2026@gmail.com' || profile?.nickname?.toLowerCase() === 'andercapo0908';
     const isAdminUser = profile?.role === 'admin' || isSpecialAdmin;
 
     // Listen to payments

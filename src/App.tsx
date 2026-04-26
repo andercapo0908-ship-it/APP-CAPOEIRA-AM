@@ -107,7 +107,75 @@ const GRADUATIONS = [
 
 // --- Components ---
 
+const RotatingArcs = ({ size = "md", color1 = "var(--color-incendeia-red)", color2 = "var(--color-incendeia-orange)" }: { size?: "sm" | "md" | "lg"; color1?: string; color2?: string }) => {
+  const insets = {
+    sm: { arc1: "-inset-1", arc2: "-inset-2" },
+    md: { arc1: "-inset-2", arc2: "-inset-4" },
+    lg: { arc1: "-inset-4", arc2: "-inset-8" }
+  };
+  
+  const currentInsets = insets[size];
+  
+  return (
+    <>
+      <motion.div 
+        animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+        className={`absolute ${currentInsets.arc1} border-2 rounded-full opacity-80 pointer-events-none`}
+        style={{ 
+          borderColor: color2,
+          boxShadow: `0 0 10px ${color2}, inset 0 0 10px ${color2}`,
+          transformStyle: 'preserve-3d',
+          willChange: 'transform'
+        }}
+      />
+      <motion.div 
+        animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        className={`absolute ${currentInsets.arc2} border-2 rounded-full opacity-60 pointer-events-none`}
+        style={{ 
+          borderColor: color1,
+          boxShadow: `0 0 8px ${color1}, inset 0 0 8px ${color1}`,
+          transformStyle: 'preserve-3d',
+          willChange: 'transform'
+        }}
+      />
+    </>
+  );
+};
+
+const MainTitle = ({ size = "lg" }: { size?: "sm" | "lg" }) => {
+  const containerClass = size === "lg" ? "text-5xl md:text-7xl" : "text-3xl md:text-5xl";
+  const proClass = size === "lg" ? "text-lg md:text-xl" : "text-[10px] md:text-xs";
+  const capoeiraClass = size === "lg" ? "text-4xl md:text-6xl" : "text-2xl md:text-4xl";
+
+  return (
+    <div className="flex flex-col items-center font-suez tracking-tight py-4">
+      <div className="relative text-shine-effect">
+        <span className={`${containerClass} text-professional-texture uppercase`}>
+          INCENDEIA
+        </span>
+      </div>
+      <div className="flex items-center gap-2 -mt-1 md:-mt-3">
+        <span className={`${capoeiraClass} text-professional-texture uppercase text-shine-effect`}>
+          CAPOEIRA
+        </span>
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white px-2 py-0.5 rounded border-2 border-incendeia-orange shadow-[0_0_15px_rgba(255,102,0,0.5)] transform -rotate-12"
+        >
+          <span className={`${proClass} text-incendeia-red font-black tracking-tighter`}>
+            PRO
+          </span>
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+
   constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -232,14 +300,10 @@ const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, auto
 );
 
 const Footer = ({ t }: { t: (pt: string, es: string) => string }) => {
-  const { appConfig } = useAuth();
   return (
-    <div className="mt-8 py-4 flex flex-col items-center gap-1 z-10">
-      <p className="text-incendeia-orange/40 text-[10px] font-bold uppercase tracking-[0.3em] text-center">
-        APP {appConfig?.groupName?.toUpperCase() || 'INCENDEIA'} ON OFICIAL
-      </p>
-      <p className="text-incendeia-orange/30 text-[8px] font-bold uppercase tracking-[0.2em] text-center">
-        DESENVOLVEDOR MESTRE DUENDE
+    <div className="mt-8 py-4 flex flex-col items-center z-10 opacity-30">
+      <p className="text-zinc-500 text-[8px] font-bold uppercase tracking-[0.3em] text-center">
+        incendeia capoeira pro app oficial
       </p>
     </div>
   );
@@ -356,7 +420,8 @@ const InkButton = ({
   className = "",
   t,
   jaguar = false,
-  small = false
+  small = false,
+  shine = false
 }: { 
   children: React.ReactNode; 
   onClick?: (e: React.MouseEvent) => void; 
@@ -364,6 +429,7 @@ const InkButton = ({
   t: (pt: string, es: string) => string;
   jaguar?: boolean;
   small?: boolean;
+  shine?: boolean;
 }) => {
   const [inkDrops, setInkDrops] = useState<{ id: number; x: number; y: number }[]>([]);
 
@@ -391,6 +457,13 @@ const InkButton = ({
       </span>
       {jaguar && (
         <div className="absolute inset-0 opacity-40 pointer-events-none mix-blend-multiply invert bg-[url('https://www.transparenttextures.com/patterns/leopard.png')]"></div>
+      )}
+      {shine && (
+        <motion.div 
+          animate={{ x: ['-200%', '300%'] }}
+          transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut", repeatDelay: 1 }}
+          className="absolute top-0 bottom-0 w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent skew-x-[30deg] z-10 pointer-events-none"
+        />
       )}
       {inkDrops.map(drop => (
         <div 
@@ -527,18 +600,7 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }:
 
       <div className="flex flex-col items-center gap-4">
         <div className="relative" style={{ perspective: '1000px' }}>
-          <motion.div 
-            animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
-            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-            className="absolute -inset-8 border-2 border-incendeia-orange rounded-full shadow-[0_0_15px_rgba(255,102,0,0.8),inset_0_0_15px_rgba(255,102,0,0.8)] opacity-80"
-            style={{ transformStyle: 'preserve-3d' }}
-          />
-          <motion.div 
-            animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute -inset-12 border-2 border-incendeia-red rounded-full shadow-[0_0_15px_rgba(204,0,0,0.8),inset_0_0_15px_rgba(204,0,0,0.8)] opacity-80"
-            style={{ transformStyle: 'preserve-3d' }}
-          />
+          <RotatingArcs size="md" />
           <img 
             src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
             alt="Logo" 
@@ -550,54 +612,19 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }:
           />
         </div>
         <div className="flex flex-col items-center gap-2 mt-8">
-          <div className="flex flex-col items-center font-black-ops tracking-widest uppercase">
-            {/* INCENDEIA with Brazil Flag Image Overlay (Matte/Fosco Brush Effect) */}
-            <span 
-              className="text-5xl md:text-6xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)] opacity-90"
-              style={{
-                backgroundImage: "url('https://flagcdn.com/w640/br.png')",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                lineHeight: '1.1',
-                filter: 'brightness(0.8) contrast(1.2)' // Matte/fosco effect
-              }}
-            >
-              INCENDEIA
-            </span>
-            {/* CAPOEIRA with Spain Flag Image Overlay (Matte/Fosco Brush Effect) */}
-            <span 
-              className="text-4xl md:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)] opacity-90 ml-4"
-              style={{
-                backgroundImage: "url('https://flagcdn.com/w640/es.png')",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                lineHeight: '1.1',
-                filter: 'brightness(0.8) contrast(1.2)' // Matte/fosco effect
-              }}
-            >
-              CAPOEIRA
-            </span>
-          </div>
-          <p className="text-zinc-500 font-bold text-[12px] md:text-[14px] uppercase tracking-[0.4em] mt-2 relative">
-            {t('ENERGIA QUE CONTAGIA', 'ENERGÍA QUE CONTAGIA')}
-            
-            {/* subtle "vazamento" texture dots over the text block for the matte ink feel */}
-            <span className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stucco.png')] opacity-30 mix-blend-overlay pointer-events-none" />
-          </p>
+          <MainTitle />
         </div>
       </div>
 
-      <div className="w-full flex flex-col gap-4 px-8">
+      <div className="w-full flex flex-col gap-4 px-8 mb-12">
+
         <InkButton 
           t={t} 
           onClick={() => { setAuthRole('member'); setAuthMode('login'); setView('auth'); }} 
           className="w-full"
           jaguar={true}
           small={true}
+          shine={true}
         >
           {t('MEMBROS', 'MIEMBROS')}
         </InkButton>
@@ -608,6 +635,7 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }:
           className="w-full distressed-red !bg-zinc-800"
           jaguar={true}
           small={true}
+          shine={true}
         >
           {t('PAINEL ADM', 'PANEL ADM')}
         </InkButton>
@@ -664,7 +692,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden bg-premium-black">
+    <div className="fixed inset-0 flex flex-col items-center justify-center p-4 relative overflow-hidden bg-premium-black">
       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/asfalt-dark.png')]"></div>
       
       <button onClick={() => setView('login')} className="absolute top-6 left-6 p-2 text-incendeia-orange z-20">
@@ -674,18 +702,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
       <div className="w-full max-w-sm z-10">
         <div className="flex flex-col items-center mb-8 text-center">
           <div className="relative" style={{ perspective: '500px' }}>
-            <motion.div 
-              animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
-              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-4 border-2 border-incendeia-orange rounded-full shadow-[0_0_10px_rgba(255,102,0,0.8),inset_0_0_10px_rgba(255,102,0,0.8)] opacity-80"
-              style={{ transformStyle: 'preserve-3d' }}
-            />
-            <motion.div 
-              animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-6 border-2 border-incendeia-red rounded-full shadow-[0_0_10px_rgba(204,0,0,0.8),inset_0_0_10px_rgba(204,0,0,0.8)] opacity-80"
-              style={{ transformStyle: 'preserve-3d' }}
-            />
+            <RotatingArcs size="sm" />
             <LazyImage 
               src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
               alt="Logo Oficial" 
@@ -695,38 +712,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
             />
           </div>
           <div className="flex flex-col items-center gap-1 mt-8">
-            <div className="flex flex-col items-center font-black-ops tracking-widest uppercase">
-              {/* INCENDEIA with Brazil Flag Image Overlay (Matte/Fosco Brush Effect) */}
-              <span 
-                className="text-4xl md:text-5xl drop-shadow-[0_3px_5px_rgba(0,0,0,0.9)] opacity-90"
-                style={{
-                  backgroundImage: "url('https://flagcdn.com/w640/br.png')",
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  lineHeight: '1.2',
-                  filter: 'brightness(0.8) contrast(1.2)'
-                }}
-              >
-                INCENDEIA
-              </span>
-              {/* CAPOEIRA with Spain Flag Image Overlay (Matte/Fosco Brush Effect) */}
-              <span 
-                className="text-3xl md:text-4xl drop-shadow-[0_3px_5px_rgba(0,0,0,0.9)] opacity-90 ml-2"
-                style={{
-                  backgroundImage: "url('https://flagcdn.com/w640/es.png')",
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  lineHeight: '1',
-                  filter: 'brightness(0.8) contrast(1.2)'
-                }}
-              >
-                CAPOEIRA
-              </span>
-            </div>
+            <MainTitle size="sm" />
           </div>
         </div>
 
@@ -751,7 +737,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
           </h2>
         </div>
 
-        <div className="flex flex-col gap-6 bg-zinc-900/50 p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
+        <div className="flex flex-col gap-4 md:gap-6 bg-zinc-900/50 p-6 md:p-8 rounded-3xl border border-white/5 backdrop-blur-sm">
           {authMode === 'register' && (
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{t('EMAIL', 'EMAIL')}</label>
@@ -759,7 +745,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
                 type="email" 
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className={`bg-black/50 border ${authError && !email.trim() ? 'border-red-500' : 'border-white/10'} rounded-xl p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
+                className={`bg-black/50 border ${authError && !email.trim() ? 'border-red-500' : 'border-white/10'} rounded-xl p-3 md:p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
                 placeholder={t('Seu email (opcional)...', 'Tu email (opcional)...')}
               />
             </div>
@@ -771,7 +757,7 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
               type="text" 
               value={nickname}
               onChange={e => setNickname(e.target.value)}
-              className={`bg-black/50 border ${authError && !nickname.trim() ? 'border-red-500' : 'border-white/10'} rounded-xl p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
+              className={`bg-black/50 border ${authError && !nickname.trim() ? 'border-red-500' : 'border-white/10'} rounded-xl p-3 md:p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
               placeholder={t('Seu apelido...', 'Tu apodo...')}
             />
           </div>
@@ -783,14 +769,14 @@ const AuthView = ({ t, setView, authRole, authMode, setAuthMode, handleAuth, app
               value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && onSubmit()}
-              className={`bg-black/50 border ${authError && password.length < 6 ? 'border-red-500' : 'border-white/10'} rounded-xl p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
+              className={`bg-black/50 border ${authError && password.length < 6 ? 'border-red-500' : 'border-white/10'} rounded-xl p-3 md:p-4 text-white focus:border-incendeia-red outline-none transition-all`} 
               placeholder="******"
             />
           </div>
 
           {authError && <p className="text-red-500 text-xs text-center font-bold uppercase">{authError}</p>}
 
-          <InkButton t={t} onClick={onSubmit} className="w-full mt-2" jaguar={true} small={true}>
+          <InkButton t={t} onClick={onSubmit} className="w-full mt-2" jaguar={true} small={true} shine={true}>
             <span className="text-xs">{isSubmitting ? t('CARREGANDO...', 'CARGANDO...') : (authMode === 'login' ? t('ENTRAR', 'ENTRAR') : t('SALVAR', 'GUARDAR'))}</span>
           </InkButton>
         </div>
@@ -847,21 +833,32 @@ const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin, appConfig }: {
         animate={{ y: 0, opacity: 1 }}
         className="w-full max-w-sm mb-8 z-20"
       >
-        <div className="bg-zinc-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-4 shadow-2xl relative overflow-hidden group">
+        <div className="bg-zinc-900/80 backdrop-blur-md rounded-3xl border border-white/10 p-5 shadow-2xl relative overflow-hidden group">
           <div className="absolute top-0 left-0 w-1 h-full bg-incendeia-red" />
-          <div className="flex items-center justify-between mb-3 px-1">
+          <div className="flex items-center justify-between mb-4 px-1">
             <div className="flex items-center gap-2">
               <div className="p-1.5 bg-incendeia-red/20 rounded-lg">
-                <Bell className="w-3.5 h-3.5 text-incendeia-red" />
+                <Bell className="w-4 h-4 text-incendeia-red" />
               </div>
-              <h3 className="text-[10px] font-black-ops text-white uppercase tracking-widest">{t('MURAL DE AVISOS', 'AVISOS RECIENTES')}</h3>
+              <h3 className="text-[11px] font-black-ops text-white uppercase tracking-widest">{t('MURAL DE AVISOS E ATUALIZAÇÕES', 'AVISOS Y ACTUALIZACIONES')}</h3>
             </div>
             {eventNotices.length > 0 && (
               <span className="text-[8px] font-bold text-incendeia-red animate-pulse uppercase tracking-tighter">● {t('AO VIVO', 'EN VIVO')}</span>
             )}
           </div>
           
-          <div className="space-y-3 max-h-[120px] overflow-y-auto no-scrollbar pr-1">
+          <div className="space-y-3 max-h-[150px] overflow-y-auto no-scrollbar pr-1">
+            {/* Updates Section */}
+            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5 opacity-60">
+               <TrendingUp className="w-3 h-3 text-incendeia-orange" />
+               <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest">{t('ÚLTIMAS ATUALIZAÇÕES DO APP', 'ÚLTIMAS ACTUALIZACIONES')}</span>
+            </div>
+            
+            <div className="bg-white/5 p-3 rounded-2xl border border-white/5 mb-3">
+              <p className="text-[9px] text-white font-bold mb-1 uppercase tracking-tighter">VERSÃO 2.0.4 - FIRE UPDATE 🔥</p>
+              <p className="text-[8px] text-zinc-400">{t('Novas animações de capoeira, logo com rotação fluida e painel de diagnóstico.', 'Nuevas animaciones de capoeira, logo con rotación fluida y panel de diagnóstico.')}</p>
+            </div>
+
             {eventNotices.length === 0 ? (
               <p className="text-[9px] text-zinc-500 italic py-2">{t('Nenhum aviso no momento...', 'No hay avisos por ahora...')}</p>
             ) : (
@@ -894,6 +891,7 @@ const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin, appConfig }: {
           transition={{ duration: 1, type: "spring" }}
           className="relative z-10 w-32 h-32 md:w-40 md:h-40 flex flex-col items-center justify-center"
         >
+          <RotatingArcs size="md" />
           <LazyImage 
             src={appConfig?.logoUrl || "https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png"} 
             alt="Logo Oficial" 
@@ -902,12 +900,15 @@ const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin, appConfig }: {
             objectFit="contain"
           />
         </motion.div>
+        <div className="absolute top-[80%] z-20">
+        </div>
 
         {/* Rotating Menu Container */}
         <motion.div
           animate={{ rotate: 360 }}
-          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-          className="absolute w-full h-full flex items-center justify-center"
+          transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+          className="absolute w-full h-full flex items-center justify-center pointer-events-none"
+          style={{ willChange: 'transform' }}
         >
           {menuItems.map((item, index) => {
             const angle = (index * (360 / menuItems.length)) - 90;
@@ -916,15 +917,17 @@ const HomeView = ({ t, setView, profile, hasNewMessages, isAdmin, appConfig }: {
             return (
               <div
                 key={index}
-                className="absolute"
+                className="absolute pointer-events-auto"
                 style={{
-                  transform: `rotate(${angle}deg) translate(${radius}px)`
+                  transform: `rotate(${angle}deg) translate(${radius}px)`,
+                  willChange: 'transform'
                 }}
               >
                 {/* Counter-rotate the item to keep it upright */}
                 <motion.div
                   animate={{ rotate: -360 }}
-                  transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+                  style={{ willChange: 'transform' }}
                 >
                   <motion.div
                     whileHover={{ scale: 1.1 }}
@@ -1047,26 +1050,7 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-8">
           <div className="relative w-36 h-36 flex items-center justify-center">
             {/* Intertwined Arcs Effect */}
-            <motion.div 
-              animate={{ rotateX: [0, 360], rotateY: [0, 180], rotateZ: [0, 360] }}
-              transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-4 border-2 rounded-full opacity-80"
-              style={{ 
-                borderColor: graduationColor,
-                boxShadow: `0 0 15px ${graduationColor}, inset 0 0 15px ${graduationColor}`,
-                transformStyle: 'preserve-3d' 
-              }}
-            />
-            <motion.div 
-              animate={{ rotateX: [360, 0], rotateY: [180, 0], rotateZ: [360, 0] }}
-              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute -inset-6 border-2 rounded-full opacity-60"
-              style={{ 
-                borderColor: graduationColor,
-                boxShadow: `0 0 10px ${graduationColor}, inset 0 0 10px ${graduationColor}`,
-                transformStyle: 'preserve-3d' 
-              }}
-            />
+            <RotatingArcs size="sm" color1={graduationColor} color2={graduationColor} />
             {/* Fire Circle Effect */}
             <motion.div 
               animate={{ rotate: 360, scale: [1, 1.1, 1] }}
@@ -5528,43 +5512,7 @@ const SplashScreen = ({ onComplete, logoUrl }: { onComplete: () => void; logoUrl
         className="mt-8 text-center z-10"
       >
         <div className="flex flex-col items-center gap-2 mt-8">
-          <div className="flex flex-col items-center font-black-ops tracking-widest uppercase">
-            {/* INCENDEIA with Brazil Flag Image Overlay (Matte/Fosco Brush Effect) */}
-            <span 
-              className="text-5xl md:text-6xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)] opacity-90"
-              style={{
-                backgroundImage: "url('https://flagcdn.com/w640/br.png')",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                lineHeight: '1.1',
-                filter: 'brightness(0.8) contrast(1.2)'
-              }}
-            >
-              INCENDEIA
-            </span>
-            {/* CAPOEIRA with Spain Flag Image Overlay (Matte/Fosco Brush Effect) */}
-            <span 
-              className="text-4xl md:text-5xl drop-shadow-[0_4px_6px_rgba(0,0,0,0.9)] opacity-90 ml-2"
-              style={{
-                backgroundImage: "url('https://flagcdn.com/w640/es.png')",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                lineHeight: '1.1',
-                filter: 'brightness(0.8) contrast(1.2)'
-              }}
-            >
-              CAPOEIRA
-            </span>
-          </div>
-          <p className="text-zinc-400 font-bold text-[12px] md:text-[14px] uppercase tracking-[0.4em] mt-4 relative">
-            ENERGIA QUE CONTAGIA
-            {/* subtle "vazamento" texture dots over the text block for the matte ink feel */}
-            <span className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stucco.png')] opacity-30 mix-blend-overlay pointer-events-none" />
-          </p>
+          <MainTitle size="sm" />
         </div>
         <div className="h-0.5 w-32 bg-gradient-to-r from-transparent via-incendeia-red to-transparent mt-8 mx-auto opacity-50" />
       </motion.div>
