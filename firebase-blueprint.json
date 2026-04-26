@@ -219,6 +219,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "description", "importance", "date"]
+    },
+    "TrainingLog": {
+      "title": "Training Log",
+      "description": "Individual training progress and date",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date"]
     }
   },
   "firestore": {
@@ -277,6 +290,10 @@
     "/eventNotices/{noticeId}": {
       "schema": "EventNotice",
       "description": "Home screen event notices and announcements"
+    },
+    "/trainingLogs/{logId}": {
+      "schema": "TrainingLog",
+      "description": "User training history"
     }
   }
 }

@@ -19,12 +19,15 @@ import {
   Graduation,
   Branch
 } from './types';
-import { storage } from './firebase';
+import { storage, db } from './firebase';
+import firebaseConfig from '../firebase-applet-config.json';
+import { addDoc, collection, serverTimestamp, getDocs, query, limit } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   LogOut, 
   ChevronLeft, 
   ChevronRight,
+  Activity,
   Home, 
   User, 
   Image as ImageIcon, 
@@ -404,89 +407,64 @@ const TestDbView = ({ setView }: { setView: (view: View) => void }) => {
   const [status, setStatus] = useState("Pronto para começar!");
   const [nomeArquivo, setNomeArquivo] = useState("");
 
-  const aoSelecionarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const arquivo = e.target.files[0];
-      setNomeArquivo(arquivo.name);
-      setStatus(`Foto "${arquivo.name}" selecionada! 🥋`);
-    }
-  };
-
-  const salvarNoFirebase = async () => {
-    if (!nomeArquivo) {
-      alert("Por favor, selecione uma foto na galeria primeiro!");
-      return;
-    }
-
+  const testarConexao = async () => {
     try {
-      setStatus("Enviando para o banco de dados...");
-      await addDoc(collection(db, "galeria_incendeia"), {
-        nome: nomeArquivo,
-        dataCriacao: serverTimestamp(),
-        tipo: "Upload Galeria"
-      });
-      setStatus("✅ SUCESSO! A foto foi registrada no sistema.");
-      setNomeArquivo(""); // Limpa para a próxima
+      setStatus("Verificando conexão com o projeto...");
+      // We test by reading the config - if it fails, the connection or rules are wrong
+      const configRef = collection(db, "config");
+      const snapshot = await getDocs(query(configRef, limit(1)));
+      setStatus("✅ CONEXÃO ESTABELECIDA! O App está comunicando com o Firebase.");
     } catch (error) {
       console.error(error);
-      setStatus("❌ Erro ao salvar. Verifique se o Firebase está conectado.");
+      setStatus("❌ Falha na conexão. Verifique as configurações do Firebase.");
     }
   };
 
   return (
     <div style={{ backgroundColor: '#000', color: '#fff', minHeight: '100vh', padding: '20px', textAlign: 'center', fontFamily: 'sans-serif' }} className="fixed inset-0 z-[200] overflow-y-auto">
-      <div className="flex justify-start mb-4">
-        <button onClick={() => setView('login')} className="text-incendeia-orange flex items-center">
-          <ChevronLeft className="w-6 h-6" /> Voltar
+      <div className="flex justify-start mb-4 max-w-lg mx-auto">
+        <button onClick={() => setView('profile')} className="text-[#eab308] flex items-center gap-2 font-bold uppercase text-xs">
+          <ChevronLeft className="w-4 h-4" /> Voltar ao Perfil
         </button>
       </div>
 
-      <header style={{ borderBottom: '2px solid #eab308', paddingBottom: '15px', marginBottom: '30px' }}>
-        <h1 style={{ color: '#eab308', margin: 0 }}>INCENDEIA CAPOEIRA</h1>
-        <p style={{ color: '#888' }}>Sistema de Gestão Proep 2026</p>
-      </header>
+      <div className="max-w-lg mx-auto">
+        <header style={{ borderBottom: '2px solid #eab308', paddingBottom: '15px', marginBottom: '30px' }}>
+          <h1 style={{ color: '#eab308', margin: 0, fontSize: '24px', fontWeight: '900' }}>DIAGNÓSTICO INCENDEIA</h1>
+          <p style={{ color: '#888', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Verificação de Infraestrutura</p>
+        </header>
 
-      <div style={{ backgroundColor: '#111', border: '1px solid #333', padding: '25px', borderRadius: '15px' }}>
-        <h3 style={{ marginBottom: '20px' }}>{status}</h3>
-        
-        <label style={{ 
-          display: 'block', 
-          backgroundColor: '#222', 
-          padding: '15px', 
-          borderRadius: '8px', 
-          cursor: 'pointer',
-          border: '1px dashed #eab308',
-          marginBottom: '20px'
-        }}>
-          📸 SELECIONAR DA GALERIA
-          <input type="file" onChange={aoSelecionarFoto} accept="image/*" style={{ display: 'none' }} />
-        </label>
+        <div style={{ backgroundColor: '#111', border: '1px solid #333', padding: '30px', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+          <div className="w-16 h-16 bg-[#eab308]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Activity className="w-8 h-8 text-[#eab308]" />
+          </div>
+          
+          <h3 style={{ marginBottom: '20px' }} className="text-sm font-bold text-zinc-300 h-10 flex items-center justify-center uppercase tracking-wider">{status}</h3>
+          
+          <button 
+            onClick={testarConexao}
+            style={{ 
+              backgroundColor: '#eab308', 
+              color: '#000', 
+              border: 'none', 
+              padding: '16px', 
+              fontWeight: '900', 
+              borderRadius: '12px', 
+              width: '100%',
+              fontSize: '14px',
+              cursor: 'pointer',
+              textTransform: 'uppercase'
+            }}
+            className="hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-yellow-500/20"
+          >
+            Executar Teste de Pulso
+          </button>
+        </div>
 
-        {nomeArquivo && (
-          <p style={{ color: '#eab308', marginBottom: '20px' }}>Arquivo: {nomeArquivo}</p>
-        )}
-
-        <button 
-          onClick={salvarNoFirebase}
-          style={{ 
-            backgroundColor: '#eab308', 
-            color: '#000', 
-            border: 'none', 
-            padding: '15px', 
-            fontWeight: 'bold', 
-            borderRadius: '8px', 
-            width: '100%',
-            fontSize: '1.1rem',
-            cursor: 'pointer'
-          }}
-        >
-          SALVAR NO APP
-        </button>
+        <footer style={{ marginTop: '40px', color: '#444', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.1em' }} className="font-bold">
+          Configuração: {firebaseConfig.projectId}
+        </footer>
       </div>
-
-      <footer style={{ marginTop: '40px', color: '#444', fontSize: '0.9rem' }}>
-        Conectado ao projeto: app-incendeia-2026-oficial
-      </footer>
     </div>
   );
 };
@@ -633,12 +611,6 @@ const LoginView = ({ t, setAuthRole, setView, setLang, setAuthMode, appConfig }:
         >
           {t('PAINEL ADM', 'PANEL ADM')}
         </InkButton>
-        <button 
-          onClick={() => { setView('test-db' as View); }} 
-          className="w-full py-2 bg-[#eab308] text-black font-bold rounded-lg mt-4 shadow-lg shadow-yellow-500/20 active:scale-95 transition-transform"
-        >
-          {t('TESTAR CONEXÃO DO APP', 'PROBAR CONEXIÓN DE LA APP')}
-        </button>
       </div>
 
       <Footer t={t} />
@@ -1386,6 +1358,15 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
             <LogOut className="w-4 h-4" />
             {t('SAIR DA CONTA', 'CERRAR SESIÓN')}
           </button>
+
+          {isAdmin && (
+            <button 
+              onClick={() => { setView('test-db' as View); }} 
+              className="w-full py-3 border border-zinc-800 text-zinc-500 font-bold uppercase text-[10px] hover:bg-zinc-800 transition-colors rounded-xl mt-4"
+            >
+              {t('DIAGNÓSTICO DO SISTEMA', 'DIAGNÓSTICO DEL SISTEMA')}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -3239,17 +3220,54 @@ const FinanceView = ({ t, showConfirm, showAlert }: { t: (pt: string, es: string
               <TrendingUp className="w-3 h-3" />
               {t('RECEITA MENSAL', 'INGRESOS MENSUALES')}
             </h3>
-            <div className="h-48 w-full">
+            <div className="h-56 w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                  <XAxis dataKey="name" stroke="#666" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#666" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px' }}
-                    itemStyle={{ color: '#ef4444', fontWeight: 'bold' }}
+                <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#ef4444" stopOpacity={1} />
+                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="#71717a" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    dy={10}
                   />
-                  <Bar dataKey="total" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <YAxis 
+                    stroke="#71717a" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickFormatter={(v) => `R$${v}`} 
+                  />
+                  <Tooltip 
+                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-zinc-900 border border-white/10 p-3 rounded-xl shadow-2xl backdrop-blur-md">
+                            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{payload[0].payload.name}</p>
+                            <p className="text-sm font-black-ops text-incendeia-red">
+                              R$ {payload[0].value?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="total" 
+                    fill="url(#barGradient)" 
+                    radius={[6, 6, 0, 0]}
+                    animationDuration={1500}
+                    animationBegin={200}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -3260,32 +3278,71 @@ const FinanceView = ({ t, showConfirm, showAlert }: { t: (pt: string, es: string
               <PieChartIcon className="w-3 h-3" />
               {t('STATUS DOS PAGAMENTOS', 'ESTADO DE LOS PAGOS')}
             </h3>
-            <div className="h-48 w-full flex items-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', borderRadius: '12px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-col gap-2 pr-4">
+            <div className="h-64 w-full flex flex-col items-center">
+              <div className="relative w-full h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={8}
+                      dataKey="value"
+                      stroke="none"
+                      animationBegin={500}
+                      animationDuration={1500}
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.color} 
+                          className="hover:opacity-80 transition-opacity cursor-pointer shadow-lg outline-none"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-zinc-900 border border-white/10 p-3 rounded-xl shadow-2xl backdrop-blur-md">
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{payload[0].name}</p>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].payload.color }} />
+                                <p className="text-sm font-bold text-white">
+                                  {payload[0].value} {payload[0].value === 1 ? t('PAGAMENTO', 'PAGO') : t('PAGAMENTOS', 'PAGOS')}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center Label */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                  <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest leading-none">TOTAL</p>
+                  <p className="text-xl font-black-ops text-white leading-tight">
+                    {statusData.reduce((acc, curr) => acc + curr.value, 0)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-4 px-4">
                 {statusData.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase">{s.name}</span>
+                  <div key={i} className="flex items-center gap-2 group cursor-default">
+                    <div className="w-2 h-2 rounded-full shadow-[0_0_5px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-125" style={{ backgroundColor: s.color }} />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest group-hover:text-zinc-200 transition-colors">
+                        {s.name}
+                      </span>
+                      <span className="text-[8px] font-bold text-zinc-600 uppercase">
+                        {Math.round((s.value / statusData.reduce((acc, curr) => acc + curr.value, 1)) * 100)}%
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

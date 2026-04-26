@@ -370,9 +370,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubs.push(unsubMasters);
 
         // Listen to training logs
-        const trainingQuery = query(collection(db, 'trainingLogs'), where('userId', '==', firebaseUser.uid), orderBy('date', 'desc'));
+        const trainingQuery = query(collection(db, 'trainingLogs'), where('userId', '==', firebaseUser.uid));
         const unsubTraining = onSnapshot(trainingQuery, (snapshot) => {
           const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TrainingLog));
+          // Manual sort to avoid composite index requirement
+          items.sort((a, b) => {
+            const timeA = a.date?.toMillis?.() || a.date?.seconds * 1000 || new Date(a.date).getTime() || 0;
+            const timeB = b.date?.toMillis?.() || b.date?.seconds * 1000 || new Date(b.date).getTime() || 0;
+            return timeB - timeA;
+          });
           setTrainingLogs(items);
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'trainingLogs');
@@ -380,9 +386,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         unsubs.push(unsubTraining);
 
         // Listen to user's own gallery items
-        const userGalleryQuery = query(collection(db, 'gallery'), where('authorUid', '==', firebaseUser.uid), orderBy('createdAt', 'desc'));
+        const userGalleryQuery = query(collection(db, 'gallery'), where('authorUid', '==', firebaseUser.uid));
         const unsubUserGallery = onSnapshot(userGalleryQuery, (snapshot) => {
           const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem));
+          // Manual sort to avoid composite index requirement
+          items.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || new Date(a.createdAt).getTime() || 0;
+            const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || new Date(b.createdAt).getTime() || 0;
+            return timeB - timeA;
+          });
           setUserGallery(items);
         }, (error) => {
           handleFirestoreError(error, OperationType.GET, 'gallery-user');
@@ -500,10 +512,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // we default to the non-admin query to avoid permission errors.
     const paymentsQuery = (isAdminUser && profile)
       ? query(collection(db, 'payments'), orderBy('date', 'desc'))
-      : query(collection(db, 'payments'), where('userId', '==', user.uid), orderBy('date', 'desc'));
+      : query(collection(db, 'payments'), where('userId', '==', user.uid));
     
     const unsubPayments = onSnapshot(paymentsQuery, (snapshot) => {
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Payment));
+      // Manual sort for non-admin to avoid composite index
+      if (!(isAdminUser && profile)) {
+        items.sort((a, b) => {
+          const timeA = (a.date as any)?.toMillis?.() || (a.date as any)?.seconds * 1000 || new Date(a.date as any).getTime() || 0;
+          const timeB = (b.date as any)?.toMillis?.() || (b.date as any)?.seconds * 1000 || new Date(b.date as any).getTime() || 0;
+          return timeB - timeA;
+        });
+      }
       setPayments(items);
     }, (error) => {
       console.error("Payments listener error:", error);
