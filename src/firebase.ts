@@ -1,11 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, inMemoryPersistence, setPersistence } from 'firebase/auth';
-import { getFirestore, doc, setLogLevel } from 'firebase/firestore';
+import { initializeFirestore, doc, setLogLevel } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
 
 // Suppress normal operational verbose warnings from Firestore like offline mode retries
 setLogLevel('error');

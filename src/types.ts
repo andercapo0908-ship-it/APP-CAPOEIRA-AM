@@ -94,6 +94,7 @@ export interface TrainingLog {
   date: any;
   feeling: string;
   duration: number;
+  type?: string;
   notes?: string;
 }
 

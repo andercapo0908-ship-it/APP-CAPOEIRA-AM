@@ -34,6 +34,7 @@ import {
   Users, 
   Award, 
   Bell,
+  ClipboardList,
   MapPin, 
   MessageSquare, 
   ShoppingBag, 
@@ -271,11 +272,17 @@ const LazyVideo = ({ src, className, objectFit = 'cover', controls = false, auto
 
 const Footer = ({ t }: { t: (pt: string, es: string) => string }) => {
   return (
-    <div className="mt-8 py-4 flex flex-col items-center z-10">
-      <p className="text-white text-[10px] font-bold uppercase tracking-[0.3em] text-center">
+    <div className="mt-8 py-6 flex flex-col items-center z-10 w-full max-w-[200px] mx-auto border-t border-white/5">
+      <img 
+        src="https://i.ibb.co/TDC785K4/file-00000000e97c720eaa21fb077e22504c.png" 
+        alt="Small Logo" 
+        className="w-10 h-10 object-contain mix-blend-screen opacity-50 mb-2 grayscale brightness-200"
+        referrerPolicy="no-referrer"
+      />
+      <p className="text-white text-[10px] font-black uppercase tracking-[0.3em] text-center leading-tight">
         INCENDEIA PRO APP OFICIAL
       </p>
-      <p className="text-white/60 text-[8px] font-bold uppercase tracking-[0.2em] text-center mt-1">
+      <p className="text-white/60 text-[8px] font-bold uppercase tracking-[0.2em] text-center mt-1.5 font-sans">
         DESENVOLVIDO POR MESTRE DUENDE
       </p>
     </div>
@@ -937,7 +944,7 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
   isAdmin: boolean;
 }) => {
-  const { trainingLogs, addTrainingLog, userGallery, uploadToGallery, deleteGalleryItem, user, uploadProfilePhoto, updateProfile, uploadProgress } = useAuth();
+  const { trainingLogs, deleteTrainingLog, addTrainingLog, userGallery, uploadToGallery, deleteGalleryItem, user, uploadProfilePhoto, updateProfile, uploadProgress } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<{file: File, url: string} | null>(null);
@@ -1088,9 +1095,26 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
           </div>
           
           <h2 className="text-2xl font-black-ops text-white uppercase tracking-widest mt-4 shadow-sm">{profile?.nickname}</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-4">
             <span className="text-zinc-300 text-[10px] font-bold uppercase tracking-widest">{t('GRADUAÇÃO', 'GRADUACIÓN')}:</span>
             <span className="text-white font-bold uppercase tracking-widest text-sm" style={{ color: graduationColor }}>{profile?.graduation}</span>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setView('edit-profile')}
+              className="bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 border border-white/10 backdrop-blur-md"
+            >
+              <Edit2 className="w-3 h-3" />
+              {t('EDITAR PERFIL', 'EDITAR PERFIL')}
+            </button>
+            <button 
+              onClick={logout}
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 border border-red-500/20 backdrop-blur-md"
+            >
+              <LogOut className="w-3 h-3" />
+              {t('SAIR', 'SALIR')}
+            </button>
           </div>
         </div>
       </div>
@@ -1146,6 +1170,17 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
       </AnimatePresence>
 
       <div className="p-6 -mt-6 relative z-20">
+        {/* Bio Section */}
+        {profile?.bio && (
+          <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <FileText className="w-12 h-12 text-white" />
+            </div>
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">{t('SOBRE MIM', 'SOBRE MÍ')}</h3>
+            <p className="text-zinc-300 text-sm leading-relaxed">{profile.bio}</p>
+          </div>
+        )}
+
         {/* Check-in Section */}
         <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl">
           <div className="flex items-center justify-between mb-4">
@@ -1198,6 +1233,41 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
             <PieChartIcon className="w-6 h-6 text-incendeia-orange mb-2" />
             <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{t('TOTAL DE HORAS', 'TOTAL DE HORAS')}</span>
             <span className="text-xl font-black-ops text-white">{totalHours}H</span>
+          </div>
+        </div>
+
+        {/* Timeline Log Section */}
+        <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <ClipboardList className="w-5 h-5 text-incendeia-orange" />
+              <h3 className="text-xs font-bold text-white uppercase tracking-widest">{t('LOG DE TREINOS', 'LOG DE ENTRENOS')}</h3>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4">
+            {trainingLogs.length === 0 ? (
+              <div className="py-4 text-center text-zinc-600 text-[10px] font-bold uppercase tracking-widest">
+                {t('NENHUM TREINO REGISTRADO', 'NINGÚN ENTRENAMIENTO REGISTRADO')}
+              </div>
+            ) : (
+              trainingLogs.slice(0, 5).map(log => (
+                <div key={log.id} className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{log.feeling}</span>
+                    <div className="flex flex-col">
+                      <span className="text-white text-[10px] font-bold uppercase tracking-widest">{format(safeToDate(log.date), 'dd/MM/yyyy')}</span>
+                      <span className="text-zinc-500 text-[8px] font-bold uppercase">{log.duration}H • {log.type || 'Treino'}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => showConfirm(t('EXCLUIR REGISTRO', 'ELIMINAR REGISTRO'), t('Deseja excluir este treino?', '¿Desea eliminar este entrenamiento?'), () => deleteTrainingLog(log.id))}
+                    className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -2498,8 +2568,9 @@ const CalendarView = ({ t, showConfirm }: {
   t: (pt: string, es: string) => string; 
   showConfirm: (title: string, message: string, onConfirm: () => void) => void; 
 }) => {
-  const { events, addEvent, deleteEvent, user, isAdmin, uploadFile, uploadProgress } = useAuth();
+  const { events, addEvent, updateEvent, deleteEvent, user, isAdmin, uploadFile, uploadProgress } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newEvent, setNewEvent] = useState<Omit<CalendarEvent, 'id'>>({
@@ -2515,12 +2586,33 @@ const CalendarView = ({ t, showConfirm }: {
     e.preventDefault();
     if (!newEvent.title || !newEvent.date) return;
     
-    await addEvent({
-      ...newEvent,
-      date: new Date(newEvent.date)
-    });
+    if (editingId) {
+      await updateEvent(editingId, {
+        ...newEvent,
+        date: new Date(newEvent.date)
+      });
+    } else {
+      await addEvent({
+        ...newEvent,
+        date: new Date(newEvent.date)
+      });
+    }
     setIsAdding(false);
+    setEditingId(null);
     setNewEvent({ title: '', description: '', date: '', location: '', type: 'training', imageUrl: '' });
+  };
+
+  const handleEdit = (event: CalendarEvent) => {
+    setEditingId(event.id);
+    setNewEvent({
+      title: event.title,
+      description: event.description,
+      date: event.date instanceof Date ? event.date.toISOString().slice(0, 16) : (event.date as any)?.toDate?.().toISOString().slice(0, 16),
+      location: event.location,
+      type: event.type,
+      imageUrl: event.imageUrl
+    });
+    setIsAdding(true);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2620,9 +2712,17 @@ const CalendarView = ({ t, showConfirm }: {
                   </div>
                 </div>
                 {isAdmin && (
-                  <button onClick={() => handleDeleteEvent(event.id)} className="text-zinc-600 hover:text-red-500 transition-colors h-fit">
-                    <Trash className="w-5 h-5" />
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => handleEdit(event)} 
+                      className="text-zinc-600 hover:text-incendeia-orange transition-colors"
+                    >
+                      <Plus className="w-5 h-5 rotate-45" />
+                    </button>
+                    <button onClick={() => handleDeleteEvent(event.id)} className="text-zinc-600 hover:text-red-500 transition-colors h-fit">
+                      <Trash className="w-5 h-5" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -2636,7 +2736,9 @@ const CalendarView = ({ t, showConfirm }: {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAdding(false)} className="fixed inset-0 bg-black/80 z-[100] backdrop-blur-sm" />
             <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="fixed bottom-0 left-0 right-0 bg-zinc-900 z-[110] rounded-t-[40px] p-8 border-t border-incendeia-red/20 max-h-[90vh] overflow-y-auto">
-              <h3 className="text-xl font-black-ops text-white mb-6 uppercase tracking-widest">{t('NOVO EVENTO', 'NUEVO EVENTO')}</h3>
+              <h3 className="text-xl font-black-ops text-white mb-6 uppercase tracking-widest">
+                {editingId ? t('EDITAR EVENTO', 'EDITAR EVENTO') : t('NOVO EVENTO', 'NUEVO EVENTO')}
+              </h3>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col items-center gap-3 mb-2">
                   <label 
@@ -2713,7 +2815,7 @@ const CalendarView = ({ t, showConfirm }: {
                   className="bg-black/50 border border-white/10 rounded-xl p-4 text-white focus:border-incendeia-red outline-none"
                 />
                 <button type="submit" className="bg-incendeia-red text-white font-black-ops py-4 rounded-xl mt-4 uppercase tracking-widest">
-                  {t('CRIAR EVENTO', 'CREAR EVENTO')}
+                  {editingId ? t('SALVAR ALTERAÇÕES', 'GUARDAR CAMBIOS') : t('CRIAR EVENTO', 'CREAR EVENTO')}
                 </button>
               </form>
             </motion.div>
@@ -3706,11 +3808,22 @@ const GraduationsView = ({ t }: { t: (pt: string, es: string) => string }) => {
 };
 
 const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => string, showConfirm: (title: string, message: string, onConfirm: () => void) => void }) => {
-  const { branches, isAdmin, deleteBranch } = useAuth();
-  const [showAdd, setShowAdd] = useState(false);
+  const { branches, isAdmin, deleteBranch, updateBranch, addBranch } = useAuth();
+  const [showForm, setShowForm] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+
+  const handleEdit = (branch: Branch) => {
+    setEditingBranch(branch);
+    setShowForm(true);
+  };
+
+  const handleClose = () => {
+    setShowForm(false);
+    setEditingBranch(null);
+  };
 
   return (
-    <div className="p-6 pb-24">
+    <div className="p-6 pb-24 text-white">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="bg-incendeia-red/20 p-2 rounded-xl">
@@ -3720,7 +3833,7 @@ const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => strin
         </div>
         {isAdmin && (
           <button 
-            onClick={() => setShowAdd(true)}
+            onClick={() => setShowForm(true)}
             className="bg-incendeia-red p-2 rounded-xl text-white shadow-lg shadow-incendeia-red/20"
           >
             <Plus className="w-6 h-6" />
@@ -3747,31 +3860,39 @@ const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => strin
                 <LazyImage src={b.imageUrl} alt={b.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent" />
                 {isAdmin && (
-                  <button 
-                    onClick={() => showConfirm(t('EXCLUIR FILIAL', 'ELIMINAR FILIAL'), t('Deseja excluir esta filial?', '¿Desea eliminar esta filial?'), () => deleteBranch(b.id))}
-                    className="absolute top-4 right-4 bg-black/60 p-2 rounded-xl text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => handleEdit(b)}
+                      className="bg-black/60 p-2 rounded-xl text-white hover:bg-incendeia-orange"
+                    >
+                      <Plus className="w-5 h-5 rotate-45" />
+                    </button>
+                    <button 
+                      onClick={() => showConfirm(t('EXCLUIR FILIAL', 'ELIMINAR FILIAL'), t('Deseja excluir esta filial?', '¿Desea eliminar esta filial?'), () => deleteBranch(b.id))}
+                      className="bg-black/60 p-2 rounded-xl text-white hover:bg-red-500"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="p-6">
                 <h3 className="text-xl font-black-ops text-white uppercase mb-4">{b.name}</h3>
                 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="flex items-center gap-3 text-zinc-400">
+                <div className="grid grid-cols-1 gap-4 text-zinc-400">
+                  <div className="flex items-center gap-3">
                     <MapPin className="w-4 h-4 text-incendeia-red" />
                     <span className="text-xs">{b.location}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="flex items-center gap-3">
                     <Calendar className="w-4 h-4 text-incendeia-red" />
                     <span className="text-xs">{b.trainingDays.join(', ')}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="flex items-center gap-3">
                     <Clock className="w-4 h-4 text-incendeia-red" />
                     <span className="text-xs">{b.trainingHours}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-zinc-400">
+                  <div className="flex items-center gap-3">
                     <Phone className="w-4 h-4 text-incendeia-red" />
                     <span className="text-xs">{b.contact}</span>
                   </div>
@@ -3799,23 +3920,33 @@ const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => strin
         )}
       </div>
 
-      {/* Add Branch Modal */}
       <AnimatePresence>
-        {showAdd && (
+        {showForm && (
           <>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowAdd(false)}
+              onClick={handleClose}
               className="fixed inset-0 bg-black/80 z-[100] backdrop-blur-sm"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-zinc-900 z-[110] rounded-[32px] border border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]"
             >
-              <h3 className="text-xl font-black-ops text-white uppercase mb-6">{t('NOVA FILIAL', 'NUEVA FILIAL')}</h3>
+              <h3 className="text-xl font-black-ops text-white uppercase mb-6">
+                {editingBranch ? t('EDITAR FILIAL', 'EDITAR FILIAL') : t('NOVA FILIAL', 'NUEVA FILIAL')}
+              </h3>
               <BranchForm 
-                onClose={() => setShowAdd(false)} 
+                onClose={handleClose} 
                 t={t}
+                initialData={editingBranch || undefined}
+                onSubmit={async (data) => {
+                  if (editingBranch) {
+                    await updateBranch(editingBranch.id, data);
+                  } else {
+                    await addBranch(data);
+                  }
+                  handleClose();
+                }}
               />
             </motion.div>
           </>
@@ -3825,17 +3956,22 @@ const BranchesView = ({ t, showConfirm }: { t: (pt: string, es: string) => strin
   );
 };
 
-const BranchForm = ({ onClose, t }: { onClose: () => void; t: (pt: string, es: string) => string }) => {
+const BranchForm = ({ onClose, t, initialData, onSubmit }: { 
+  onClose: () => void; 
+  t: (pt: string, es: string) => string;
+  initialData?: Branch;
+  onSubmit?: (data: Omit<Branch, 'id' | 'createdAt'>) => Promise<void>;
+}) => {
   const { addBranch, uploadFile, uploadProgress } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    imageUrl: '',
-    mapUrl: '',
-    contact: '',
-    trainingDays: [] as string[],
-    trainingHours: '',
-    location: ''
+    name: initialData?.name || '',
+    imageUrl: initialData?.imageUrl || '',
+    mapUrl: initialData?.mapUrl || '',
+    contact: initialData?.contact || '',
+    trainingDays: initialData?.trainingDays || [] as string[],
+    trainingHours: initialData?.trainingHours || '',
+    location: initialData?.location || ''
   });
 
   const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
@@ -3857,7 +3993,12 @@ const BranchForm = ({ onClose, t }: { onClose: () => void; t: (pt: string, es: s
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.imageUrl) return alert(t('Por favor, suba uma imagem', 'Por favor, suba una imagen'));
-    await addBranch(formData);
+    
+    if (onSubmit) {
+      await onSubmit(formData);
+    } else {
+      await addBranch(formData);
+    }
     onClose();
   };
 
@@ -4267,7 +4408,7 @@ const ChatView = ({ t, messages, sendMessage, deleteMessage, user, isAdmin, show
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[8px] font-bold text-zinc-500 uppercase">{m.authorName}</span>
-              {isAdmin && (
+              {(isAdmin || m.authorUid === user?.uid) && (
                 <button 
                   onClick={() => handleDeleteMessage(m.id)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-red-500"
@@ -5535,6 +5676,10 @@ const SplashScreen = ({ onComplete, logoUrl }: { onComplete: () => void; logoUrl
         </div>
         <div className="h-0.5 w-32 bg-gradient-to-r from-transparent via-incendeia-red to-transparent mt-8 mx-auto opacity-50" />
       </motion.div>
+
+      <div className="absolute bottom-8 left-0 right-0 px-6">
+        <Footer t={(pt, es) => pt} />
+      </div>
     </motion.div>
   );
 };

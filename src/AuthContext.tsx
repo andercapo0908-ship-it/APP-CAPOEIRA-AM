@@ -69,6 +69,7 @@ interface AuthContextType {
   updateMaster: (id: string, master: Partial<Master>) => Promise<void>;
   deleteMaster: (id: string) => Promise<void>;
   addTrainingLog: (log: Omit<TrainingLog, 'id' | 'userId' | 'createdAt'>) => Promise<void>;
+  deleteTrainingLog: (id: string) => Promise<void>;
   trainingLogs: TrainingLog[];
   loadMoreGallery: () => Promise<void>;
   messages: ChatMessage[];
@@ -1016,6 +1017,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteTrainingLog = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'trainingLogs', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'trainingLogs/' + id);
+    }
+  };
+
   const markNotificationAsRead = async (id: string) => {
     if (!user) return;
     try {
@@ -1149,6 +1159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateMaster,
       deleteMaster,
       addTrainingLog,
+      deleteTrainingLog,
       trainingLogs,
       loadMoreGallery,
       messages, 
