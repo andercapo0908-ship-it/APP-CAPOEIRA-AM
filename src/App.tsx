@@ -1095,26 +1095,9 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
           </div>
           
           <h2 className="text-2xl font-black-ops text-white uppercase tracking-widest mt-4 shadow-sm">{profile?.nickname}</h2>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2">
             <span className="text-zinc-300 text-[10px] font-bold uppercase tracking-widest">{t('GRADUAÇÃO', 'GRADUACIÓN')}:</span>
             <span className="text-white font-bold uppercase tracking-widest text-sm" style={{ color: graduationColor }}>{profile?.graduation}</span>
-          </div>
-
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setView('edit-profile')}
-              className="bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 border border-white/10 backdrop-blur-md"
-            >
-              <Edit2 className="w-3 h-3" />
-              {t('EDITAR PERFIL', 'EDITAR PERFIL')}
-            </button>
-            <button 
-              onClick={logout}
-              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 border border-red-500/20 backdrop-blur-md"
-            >
-              <LogOut className="w-3 h-3" />
-              {t('SAIR', 'SALIR')}
-            </button>
           </div>
         </div>
       </div>
@@ -1170,17 +1153,6 @@ const ProfileView = ({ t, setView, profile, logout, showConfirm, isAdmin }: {
       </AnimatePresence>
 
       <div className="p-6 -mt-6 relative z-20">
-        {/* Bio Section */}
-        {profile?.bio && (
-          <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-              <FileText className="w-12 h-12 text-white" />
-            </div>
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">{t('SOBRE MIM', 'SOBRE MÍ')}</h3>
-            <p className="text-zinc-300 text-sm leading-relaxed">{profile.bio}</p>
-          </div>
-        )}
-
         {/* Check-in Section */}
         <div className="bg-zinc-900/80 backdrop-blur-md p-6 rounded-3xl border border-white/10 mb-6 shadow-xl">
           <div className="flex items-center justify-between mb-4">
